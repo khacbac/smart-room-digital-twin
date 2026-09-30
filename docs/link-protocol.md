@@ -241,6 +241,25 @@ trên GPIO48.
 - Node đọc UART **không chặn** trong `loop()` (đọc hết `available()` mỗi vòng, đẩy vào `StreamDecoder`). Buffer
   UART 2 KB mỗi chiều, lớn hơn một frame lớn nhất, nên gửi một frame cũng không phải chờ.
 
+**M3: cắm 2 mạch thật.** Làm theo thứ tự, bước nào hỏng thì dừng ở đó:
+
+1. Broker nghe trên LAN: `cd broker && mosquitto -c mosquitto-lan.conf -v`. Lần đầu Windows hỏi firewall thì
+   cho phép *Private network* (mạng Wi-Fi của máy phải đang để profile Private). Lấy IP LAN của PC bằng `ipconfig`.
+   Backend và dashboard chạy như README (backend nối `127.0.0.1:1883` vẫn được).
+2. `cp device/secrets.ini.example device/secrets.ini` (gitignored), điền SSID/password (Wi-Fi **2.4 GHz**, không
+   phải mạng guest có client isolation) và `MQTT_HOST` = IP ở bước 1. Board v1.1 thì thêm `-D PIN_STATUS_RGB=38`.
+3. Nạp bằng cổng **UART** của DevKitC-1 (cổng USB-UART, cũng là cổng console): `pio run -e node -t upload
+   --upload-port COMa`, `pio run -e gateway -t upload --upload-port COMb`. Không nạp bản `*-wokwi` (§6.2).
+4. Chưa nối dây link: LED gateway phải đi đỏ → vàng → **xanh nháy** (MQTT up, chưa có node). Kẹt ở đỏ: Wi-Fi
+   (SSID, 2.4 GHz). Kẹt ở vàng: broker (IP, firewall, `mosquitto-lan.conf`). `pio device monitor -p COMb` in
+   `[wifi]` / `[mqtt]`.
+5. Tắt nguồn, nối dây: **GPIO5 node → GPIO4 gateway**, **GPIO4 node → GPIO5 gateway**, **GND ↔ GND**. Cấp nguồn cả hai
+   qua USB (hai máy khác nhau cũng được, miễn chung GND).
+6. LED **xanh đứng**; dashboard lên online, telemetry chạy từ cảm biến thật. Mở/đóng cửa từ dashboard → servo quay,
+   command tới `executed`. Console gateway gõ `stats`: `rx frames` tăng, `errors` / `lost` đứng yên.
+7. Rút dây TX của node: sau 15 s LED nháy, dashboard offline; cắm lại → online. `errors` cứ tăng (log
+   `[link] dropped frame`) thì kiểm tra GND chung, dây ngắn lại.
+
 ### 6.2 USB serial tới PC (mỗi người dev một mình)
 
 Script trên PC đóng vai mạch kia, nói đúng stream frame (§3.2) qua một **adapter USB-UART** (CP2102/CH340)
@@ -384,7 +403,7 @@ tools/link-sim/           @srdt/link-sim
   `pio test -e native` và `pnpm --filter @srdt/link-sim test` phải xanh.
 - Sửa schema MQTT (§5 spec): làm như hiện tại, sửa `packages/contracts` + `lib/protocol`. Gateway không bị ảnh hưởng.
 - Mốc: ~~M0 chốt tài liệu này~~ (2026-09-30) → M1 mỗi người chạy với fake peer, rồi 2 firmware với nhau qua
-  `splice` (§6.2) → M3 gặp nhau một lần để cắm UART thật. M2 (MQTT tunnel) đã bỏ.
+  `splice` (§6.2) → M3 gặp nhau một lần để cắm UART thật (checklist ở §6.1). M2 (MQTT tunnel) đã bỏ.
 
 ## 9. Quyết định (chốt ở M0, 2026-09-30)
 

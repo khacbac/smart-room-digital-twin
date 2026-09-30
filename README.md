@@ -110,5 +110,5 @@ Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_
 2. Auth cho dashboard/API (Firebase Auth) trước khi public backend.
 3. Broker có TLS + user/password khi rời máy local (HiveMQ Cloud / EMQX / Mosquitto trên VM).
 4. Twin 3D (three.js) thay `RoomTwin.tsx`, dữ liệu vào giữ nguyên `TwinView`.
-5. M3: cắm UART giữa 2 mạch thật. LED RGB onboard của gateway báo Wi-Fi / MQTT / node ([docs/link-protocol.md](docs/link-protocol.md) §5.5;
-   board v1.1 thì build với `-D PIN_STATUS_RGB=38`).
+5. M3: cắm UART giữa 2 mạch thật, theo checklist ở [docs/link-protocol.md](docs/link-protocol.md) §6.1: `device/secrets.ini`
+   (Wi-Fi + IP broker cho `env:gateway`), `broker/mosquitto-lan.conf`, LED RGB của gateway báo Wi-Fi / MQTT / node (§5.5).

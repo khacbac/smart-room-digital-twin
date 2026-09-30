@@ -11,6 +11,7 @@ dist/
 *.tsbuildinfo
 
 # platformio
+device/secrets.ini
 device/.pio/
 .pio/
 device/.vscode/
