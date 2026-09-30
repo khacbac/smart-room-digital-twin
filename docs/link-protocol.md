@@ -211,7 +211,7 @@ Gateway **không** validate nội dung command. Node đã làm việc đó, và 
 
 Broker gửi lại QoS 1 thì node nhận lại cùng `commandId`. `CommandHandler` trả lại ack cũ, không chạy lại lệnh.
 
-### 5.5 LED trạng thái của gateway (chưa làm)
+### 5.5 LED trạng thái của gateway
 
 Gateway không có màn hình, nên dùng **LED RGB onboard** (WS2812) của ESP32-S3 DevKitC-1: cắm mạch thật là biết
 ngay đứt ở chặng nào. Chân: GPIO48 trên board v1.0, GPIO38 trên v1.1; đặt bằng `-D PIN_STATUS_RGB`
@@ -224,7 +224,9 @@ ngay đứt ở chặng nào. Chân: GPIO48 trên board v1.0, GPIO38 trên v1.1;
 | Xanh lá | MQTT up và node up |
 | Nháy (màu như trên, 1 Hz) | Mất node: `PeerMonitor` 15 s không nhận frame nào (§5.3), hoặc chưa có HELLO |
 
-LED chỉ đọc trạng thái mà `net_task` và `GatewayLink` đã có sẵn, không thêm logic link.
+LED chỉ đọc trạng thái mà `net_task` và `GatewayLink` đã có sẵn, không thêm logic link: `device/src/gateway/status_led.cpp`,
+mặc định GPIO48 (v1.0). Wi-Fi = `net::rssi() != 0`. Trong Wokwi, `device/wokwi/gateway/diagram.json` có một WS2812 rời
+trên GPIO48.
 
 ## 6. Transport
 

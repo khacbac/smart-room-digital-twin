@@ -74,6 +74,15 @@
 #endif
 #define LINK_UART_BUFFER 2048     // each way, > one max stream frame (1035 B)
 
+// Gateway status LED (docs/link-protocol.md §5.5): the DevKitC-1's onboard WS2812.
+// GPIO48 on board v1.0, GPIO38 on v1.1 (-D PIN_STATUS_RGB=38). Gateway only: on the
+// node GPIO38 is PIN_LED_GREEN.
+#ifndef PIN_STATUS_RGB
+#define PIN_STATUS_RGB 48
+#endif
+#define STATUS_RGB_LEVEL 16       // of 255: the bare LED is blinding at full power
+#define STATUS_RGB_BLINK_MS 500   // half period: 1 Hz while the node is lost
+
 // ---- Pins (§4.4, must match diagram.json) ----------------------------------
 
 #define PIN_LDR 1          // ADC1_CH0 (ADC2 is unusable while Wi-Fi is active)

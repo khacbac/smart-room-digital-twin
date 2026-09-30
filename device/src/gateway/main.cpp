@@ -6,8 +6,8 @@
 //   node ─UART1─▶ StreamDecoder ─▶ GatewayLink ─publish─▶ net::publish ─▶ net_task ─▶ MQTT
 //   MQTT command ─▶ net_task ─▶ net::popCommand ─▶ GatewayLink::onCommand ─UART1─▶ node
 //
-// loop() owns the link and the UART; only net_task touches MQTT. The serial console
-// has `stats` and `help`.
+// loop() owns the link and the UART; only net_task touches MQTT. The onboard RGB LED
+// shows Wi-Fi / MQTT / node (status_led.h). The serial console has `stats` and `help`.
 
 #include <Arduino.h>
 #include <esp_system.h>
@@ -17,6 +17,7 @@
 #include "link_frame.h"
 #include "link_gateway.h"
 #include "net.h"
+#include "status_led.h"
 
 static HardwareSerial& port = Serial1;
 static lnk::StreamDecoder decoder;
@@ -189,6 +190,7 @@ static const char* resetReasonName(esp_reset_reason_t r) {
 
 void setup() {
     Serial.begin(115200);
+    status_led::begin();
     port.setRxBufferSize(LINK_UART_BUFFER);  // core 2.x: before begin()
     port.setTxBufferSize(LINK_UART_BUFFER);
     port.begin(LINK_BAUD, SERIAL_8N1, PIN_LINK_RX, PIN_LINK_TX);
@@ -214,6 +216,8 @@ void loop() {
         else gw.clearRssi();
     }
     if (gw.tick(now) == lnk::PeerChange::Down) Serial.println("[link] node lost (no frame for 15 s) → offline status");
+    // net_task keeps the RSSI only while Wi-Fi is up (0 = down).
+    status_led::update(net::rssi() != 0, gw.mqttUp(), gw.nodeUp() && gw.registered(), now);
     pollConsole();
     delay(1);
 }

@@ -100,6 +100,7 @@ Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_
 - [x] Dashboard (Chrome headless, desktop + mobile 390 px, light/dark): twin hiện góc cửa 45°, buzzer on, nhãn "manual", đếm ngược override
 - [x] `env:gateway-wokwi` trong Wokwi + `fake-node` (rfc2217): HELLO, Wi-Fi, MQTT, NTP → TIME; `die 20` → node lost → offline status → node up; tắt Mosquitto → mqtt down, backoff 1–16 s, reconnect đúng 1 lần `mqtt up`; command từ dashboard → `forwarded` → node `executed`
 - [x] 2 mạch thật trong Wokwi (`node-wokwi` :4002 ⇄ `splice` ⇄ `gateway-wokwi` :4001): dashboard online, telemetry từ cảm biến ảo của node, mở/đóng cửa từ dashboard → servo quay; `cut 20` → cả 2 mạch báo mất link sau 15 s, dashboard offline, nối lại → online; đổi cảm biến ảo của node → WARNING/DANGER lên dashboard
+- [x] LED trạng thái gateway (`gateway-wokwi`, WS2812 trên GPIO48): đỏ → vàng → xanh khi Wi-Fi rồi MQTT lên, nháy khi mất node
 - [ ] Chưa chạy lại với Wokwi trong repo này (firmware giống hệt smart-room, chỉ đổi prefix `srdt` và dòng LCD khởi động)
 - [ ] Firestore / Firebase Hosting / Cloud Run: chưa làm, xem `docs/cloud.md`
 
@@ -109,4 +110,5 @@ Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_
 2. Auth cho dashboard/API (Firebase Auth) trước khi public backend.
 3. Broker có TLS + user/password khi rời máy local (HiveMQ Cloud / EMQX / Mosquitto trên VM).
 4. Twin 3D (three.js) thay `RoomTwin.tsx`, dữ liệu vào giữ nguyên `TwinView`.
-5. LED RGB trạng thái cho `env:gateway` ([docs/link-protocol.md](docs/link-protocol.md) §5.5), rồi M3: cắm UART giữa 2 mạch thật.
+5. M3: cắm UART giữa 2 mạch thật. LED RGB onboard của gateway báo Wi-Fi / MQTT / node ([docs/link-protocol.md](docs/link-protocol.md) §5.5;
+   board v1.1 thì build với `-D PIN_STATUS_RGB=38`).

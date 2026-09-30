@@ -3,11 +3,15 @@
   "author": "smart-room",
   "editor": "wokwi",
   "parts": [
-    {"type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {}}
+    {"type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {}},
+    {"type": "wokwi-neopixel", "id": "rgb", "top": -60, "left": 40, "attrs": {}}
   ],
   "connections": [
     ["esp:5", "$serialMonitor:RX", "cyan", []],
-    ["esp:4", "$serialMonitor:TX", "cyan", []]
+    ["esp:4", "$serialMonitor:TX", "cyan", []],
+    ["esp:48", "rgb:DIN", "green", []],
+    ["esp:5V", "rgb:VDD", "red", []],
+    ["esp:GND.1", "rgb:VSS", "black", []]
   ],
   "dependencies": {}
 }
