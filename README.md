@@ -28,7 +28,7 @@ Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
 | `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
 | `server/src/storage/` | Interface storage + driver `memory` (chạy được) + `firestore` (stub) | 🟡 Firestore chờ team cloud |
-| `tools/link-sim/` | Fake gateway / fake node cho phương án 2 mạch: link frame qua serial / TCP / MQTT tunnel, bridge sang broker ([docs](docs/link-protocol.md#62-usb-serial-tới-pc-mỗi-người-dev-một-mình)) | 🟡 nháp, 22 test |
+| `tools/link-sim/` | Fake gateway / fake node cho phương án 2 mạch: link frame qua serial / TCP / MQTT tunnel, bridge sang broker; `splice` nối 2 mạch thật ([docs](docs/link-protocol.md#62-usb-serial-tới-pc-mỗi-người-dev-một-mình)) | 🟡 nháp, 23 test |
 | `dashboard/` | Next.js 16 static export: value cards, **room twin (SVG)**, chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` là placeholder |
 | `cloud/` | Mock config Firebase Hosting / Firestore rules + indexes, Dockerfile cho Cloud Run | 🟡 mock, chưa deploy |
 | `docs/` | Kiến trúc, hướng dẫn cloud, spec gốc, [link gateway ⇄ node](docs/link-protocol.md) (nháp) | |
@@ -62,6 +62,9 @@ Thiết bị, chọn một trong hai:
 - **Mạch gateway (2 mạch):** `pio run -e gateway -t upload`, cùng chân GPIO4/5, rồi
   `pnpm --filter @srdt/link-sim fake-node --link serial:COMx`. Trong Wokwi: `pio run -e gateway-wokwi`, config
   `device/wokwi/gateway/wokwi.toml` và `fake-node --link rfc2217:127.0.0.1:4001` (console gateway hiện thành `gw| …`).
+- **Cả 2 mạch trong Wokwi, nối với nhau:** build `node-wokwi` + `gateway-wokwi`, chạy node trong một VS Code window và
+  gateway trong window thứ hai (mở thư mục `device/`), rồi `pnpm --filter @srdt/link-sim splice` (4000 ⇄ 4001, in cả
+  `node| …` và `gw| …`; stdin `cut 20` để rút dây).
 
 Kiểm tra nhanh bằng curl:
 

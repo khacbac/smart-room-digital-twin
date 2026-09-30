@@ -5,6 +5,7 @@
 #   pio run -e gateway-wokwi   (env:gateway + its console on the link, printed by link-sim)
 #   (VS Code) "Wokwi: Select Config File" → device/wokwi/gateway/wokwi.toml, then "Wokwi: Start Simulator"
 #   pnpm --filter @srdt/link-sim fake-node --link rfc2217:127.0.0.1:4001
+# Or with the real node in a second VS Code window (device/wokwi/node): pnpm --filter @srdt/link-sim splice
 [wokwi]
 version = 1
 firmware = '../../.pio/build/gateway-wokwi/firmware.bin'

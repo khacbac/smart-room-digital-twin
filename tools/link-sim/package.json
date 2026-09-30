@@ -7,7 +7,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
     "fake-gateway": "tsx scripts/fake-gateway.ts",
-    "fake-node": "tsx scripts/fake-node.ts"
+    "fake-node": "tsx scripts/fake-node.ts",
+    "splice": "tsx scripts/splice.ts"
   },
   "dependencies": {
     "@srdt/contracts": "workspace:*",

@@ -229,13 +229,14 @@ Broker gửi lại QoS 1 thì node nhận lại cùng `commandId`. `CommandHandl
 Script trên PC đóng vai mạch kia, nói đúng stream frame (§3.2) qua một **adapter USB-UART** (CP2102/CH340)
 cắm vào đúng chân UART link. Nhờ vậy firmware không cần một build riêng cho dev.
 
-Hai script nằm trong [`tools/link-sim/`](../tools/link-sim). Logic của chúng (`src/gateway.ts`, `src/node.ts`) làm đúng
+Các script nằm trong [`tools/link-sim/`](../tools/link-sim). Logic của chúng (`src/gateway.ts`, `src/node.ts`) làm đúng
 §4–§5, nên cũng là bản tham chiếu khi viết firmware.
 
 | Script | Dành cho | Làm gì |
 |---|---|---|
 | `fake-gateway` | người làm **node** | Nói link trên `--link`, bridge sang broker thật (backend + dashboard chạy như thường). `--mqtt none` thì chỉ in ra những gì sẽ publish. stdin: `open [1-90]`, `close`, `buzz on\|off`, `clear`, `ping` (gửi COMMAND thẳng xuống node, ack không publish), `mqtt down\|up` (giả mất broker), `stats` |
 | `fake-node` | người làm **gateway** | HELLO, telemetry/status/event từ phòng giả lập (cùng mô hình với `server/scripts/fake-device.ts`), thực thi và ack command. stdin: `hot`, `smoke`, `calm`, `die [sec]` (im lặng để test presence), `reboot`, `stats` |
+| `splice` | cả hai | Không giả mạch nào: nối **2 mạch thật** (`--node`, `--gateway`, mặc định 2 cổng Wokwi 4000/4001), chuyển nguyên frame giữa hai bên, in console `node\| …` / `gw\| …`. stdin: `cut [sec]` (rút dây, cả 2 bên phải báo mất nhau sau 15 s), `stats` |
 
 ```sh
 # Không cần phần cứng: cả chuỗi trên PC (broker + backend đang chạy như README)
@@ -290,6 +291,22 @@ Console của gateway hiện trong log fake-node dưới dạng `gw| …` (`[boo
 ra theo dõi qua backend và dashboard (node lên online, telemetry chạy, command từ dashboard có ack). Nếu fake-node không
 in `mqtt path up`, gateway chưa tới được broker: xem dòng `gw| [mqtt] …`.
 
+**Hai mạch trong Wokwi, nối với nhau**: firmware thật ở cả hai đầu, cảm biến ảo của node đi tới dashboard. Mỗi
+VS Code window chỉ chạy một simulator, nên cần 2 window, và cả hai phải đang hiện (không thu nhỏ), không thì Wokwi tạm dừng:
+
+```sh
+cd device && pio run -e node-wokwi && pio run -e gateway-wokwi
+# Window 1 (thư mục repo): "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, "Wokwi: Start Simulator"
+# Window 2 (File → New Window, mở thư mục device/): chọn wokwi/gateway/wokwi.toml, "Wokwi: Start Simulator"
+pnpm --filter @srdt/link-sim splice     # rfc2217:127.0.0.1:4000 (node) ⇄ rfc2217:127.0.0.1:4001 (gateway)
+```
+
+- splice decode rồi encode lại từng frame: frame hợp lệ tới bên kia y nguyên byte, nhiễu và frame hỏng dừng ở đây.
+  Không có `-v` thì chỉ in các frame không định kỳ (HELLO, HELLO_REQUEST, TIME, STATUS, EVENT, COMMAND, ACK).
+- `--node` / `--gateway` nhận mọi spec như `--link`, ví dụ `--node serial:COM5` nối mạch node thật (qua USB-UART) với
+  gateway trong Wokwi.
+- Mỗi simulator chạy theo đồng hồ riêng và có thể chậm hơn giờ thật. Timeout 15 s vẫn dư, nhưng đừng đo độ trễ ở đây.
+
 ### 6.3 MQTT tunnel (test tích hợp từ xa, M2)
 
 Hai mạch thật ở 2 nơi, cùng kết nối Wi-Fi tới một broker cloud (HiveMQ Cloud / EMQX Serverless, có TLS + user).
@@ -332,7 +349,8 @@ tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
   src/gateway.ts, node.ts              logic §4–§5, test được với đồng hồ giả
   src/transport.ts                     serial / tcp / rfc2217 / tunnel / memory
-  scripts/fake-gateway.ts, fake-node.ts
+  src/splice.ts                        dây nối 2 mạch thật (script splice)
+  scripts/fake-gateway.ts, fake-node.ts, splice.ts
   test/                                codec + node ⇄ gateway (payload phải qua contracts)
 ```
 
