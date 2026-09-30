@@ -1,10 +1,10 @@
-# Link protocol: gateway ⇄ node (bản nháp v0.2)
+# Link protocol: gateway ⇄ node (v0.2)
 
-> **Trạng thái: nháp v0.2, chờ 2 người review và chốt ở M0.** Codec đã có trong
+> **Trạng thái: v0.2, đã chốt ở M0 (2026-09-30).** Codec đã có trong
 > [`device/lib/link/`](../device/lib/link/src) (test: `pio test -e native`), bản sao TS và 2 fake peer trong
 > [`tools/link-sim/`](../tools/link-sim) (§6.2).
 > v0.2: LINK_STATE mang `bootId` của node đã đăng ký và là heartbeat của gateway; gateway cấu hình sẵn `nodeId`.
-> Chỗ nào còn phải quyết định được đánh dấu **❓** và gom lại ở §9.
+> Các quyết định chốt ở M0 và lý do: §9.
 > Đổi format frame = đổi `kVersion` + sửa lib + sửa test golden, trong **cùng một PR**.
 
 ## 1. Mục tiêu và phạm vi
@@ -14,7 +14,7 @@ Tách firmware hiện tại (1 ESP32-S3) thành 2 mạch:
 | Mạch | Vai trò | Lấy từ code hiện tại |
 |---|---|---|
 | **Node** | Đọc cảm biến, edge rules, chấp hành tại chỗ (LED, RGB, servo, buzzer, LCD). **Tự chạy an toàn khi mất gateway.** | `sensors`, `actuators`, `display`, `lib/edge_rules`, `lib/protocol` (build payload + xử lý command) |
-| **Gateway** | Wi-Fi, MQTT, NTP, cầu nối link ⇄ MQTT, presence của node | `net_task`, cấu hình MQTT/LWT |
+| **Gateway** | Wi-Fi, MQTT, NTP, cầu nối link ⇄ MQTT, presence của node, LED trạng thái (§5.5) | `net_task`, cấu hình MQTT/LWT |
 
 Nguyên tắc:
 
@@ -173,7 +173,7 @@ gateway boot ──HELLO_REQUEST──▶ node  node trả HELLO → STATUS, KH�
 ```
 
 Gateway gửi LINK_STATE khi trạng thái MQTT đổi, ngay sau HELLO, và **mỗi khi đã 5 s không gửi frame nào**
-(heartbeat của gateway). Gateway gửi lại TIME mỗi 10 phút (`LINK_TIME_RESYNC_MS`) ❓. Khi NTP chưa sync, gateway
+(heartbeat của gateway). Gateway gửi lại TIME mỗi 10 phút (`LINK_TIME_RESYNC_MS`). Khi NTP chưa sync, gateway
 **không** gửi TIME (LINK_STATE vẫn gửi bình thường), và gửi ngay ở `tick()` đầu tiên sau khi NTP sync. Trong lúc đó
 payload của node không có `ts`, giống bản 1 mạch khi chưa có NTP.
 
@@ -211,11 +211,26 @@ Gateway **không** validate nội dung command. Node đã làm việc đó, và 
 
 Broker gửi lại QoS 1 thì node nhận lại cùng `commandId`. `CommandHandler` trả lại ack cũ, không chạy lại lệnh.
 
+### 5.5 LED trạng thái của gateway (chưa làm)
+
+Gateway không có màn hình, nên dùng **LED RGB onboard** (WS2812) của ESP32-S3 DevKitC-1: cắm mạch thật là biết
+ngay đứt ở chặng nào. Chân: GPIO48 trên board v1.0, GPIO38 trên v1.1; đặt bằng `-D PIN_STATUS_RGB`
+(core 2.x: `neopixelWrite()`). Độ sáng thấp.
+
+| LED | Nghĩa |
+|---|---|
+| Đỏ | Chưa có Wi-Fi |
+| Vàng | Có Wi-Fi, chưa có MQTT (hoặc đang backoff) |
+| Xanh lá | MQTT up và node up |
+| Nháy (màu như trên, 1 Hz) | Mất node: `PeerMonitor` 15 s không nhận frame nào (§5.3), hoặc chưa có HELLO |
+
+LED chỉ đọc trạng thái mà `net_task` và `GatewayLink` đã có sẵn, không thêm logic link.
+
 ## 6. Transport
 
 ### 6.1 UART (chạy thật, 2 mạch chung hộp)
 
-- 115200 baud, 8N1, không flow control ❓. Frame lớn nhất (1035 byte) mất khoảng 90 ms; telemetry vài trăm byte mỗi 2 s,
+- 115200 baud, 8N1, không flow control. Frame lớn nhất (1035 byte) mất khoảng 90 ms; telemetry vài trăm byte mỗi 2 s,
   chỉ dùng vài phần trăm băng thông.
 - Nối chéo TX ↔ RX, **chung GND**, cả 2 đều 3.3 V. Dây dài hơn ~1 m thì cân nhắc RS485.
 - Dùng **UART1/UART2** cho link, **không** dùng USB serial (`Serial`), vì USB serial đang dành cho log và
@@ -307,7 +322,7 @@ pnpm --filter @srdt/link-sim splice     # rfc2217:127.0.0.1:4002 (node) ⇄ rfc2
   gateway trong Wokwi.
 - Mỗi simulator chạy theo đồng hồ riêng và có thể chậm hơn giờ thật. Timeout 15 s vẫn dư, nhưng đừng đo độ trễ ở đây.
 
-### 6.3 MQTT tunnel (test tích hợp từ xa, M2)
+### 6.3 MQTT tunnel (chỉ có trong link-sim)
 
 Hai mạch thật ở 2 nơi, cùng kết nối Wi-Fi tới một broker cloud (HiveMQ Cloud / EMQX Serverless, có TLS + user).
 
@@ -317,13 +332,14 @@ Hai mạch thật ở 2 nơi, cùng kết nối Wi-Fi tới một broker cloud (
 | `srdt-link/{nodeId}/down` | gateway → node | raw frame, QoS 0 |
 
 - Prefix `srdt-link/` **khác hẳn** `srdt/`, để backend không bao giờ nhìn thấy frame link.
-- Chỉ bật transport này bằng build flag (`-D LINK_TRANSPORT_MQTT`) ❓. Bản chạy thật không có Wi-Fi trên node.
+- **Firmware không có transport này** (đã bỏ mốc M2, §9 câu 6): test tích hợp 2 mạch dùng `splice` + 2 simulator
+  (§6.2). Transport `tunnel:` vẫn còn trong `tools/link-sim`, ví dụ để nối fake peer của 2 người qua broker cloud.
 - Độ trễ qua Internet khoảng 50–300 ms, vẫn thoải mái so với timeout command 10 s. Đừng dùng tunnel để đo hiệu năng.
 
-### 6.4 ESP-NOW (chưa hỗ trợ)
+### 6.4 ESP-NOW (ngoài phạm vi v0.2)
 
 Arduino core 2.x (D13) dựa trên ESP-IDF 4.4, nên mỗi gói ESP-NOW tối đa **250 byte**. Telemetry/status JSON dài hơn
-mức đó, nên cần một trong hai cách: chia nhỏ frame, hoặc payload binary gọn. Để lại cho bản sau nếu thật sự cần node không dây ❓.
+mức đó, nên cần một trong hai cách: chia nhỏ frame, hoặc payload binary gọn. Để lại cho bản sau nếu thật sự cần node không dây.
 
 ## 7. Tổ chức code
 
@@ -365,17 +381,23 @@ tools/link-sim/           @srdt/link-sim
 - Sửa `lib/link` hoặc tài liệu này: làm PR, **người kia review**, sửa **cả** `tools/link-sim` cho khớp;
   `pio test -e native` và `pnpm --filter @srdt/link-sim test` phải xanh.
 - Sửa schema MQTT (§5 spec): làm như hiện tại, sửa `packages/contracts` + `lib/protocol`. Gateway không bị ảnh hưởng.
-- Mốc: M0 chốt tài liệu này → M1 mỗi người chạy với fake peer (§6.2) → M2 test qua MQTT tunnel (§6.3)
-  → M3 gặp nhau một lần để cắm UART thật.
+- Mốc: ~~M0 chốt tài liệu này~~ (2026-09-30) → M1 mỗi người chạy với fake peer, rồi 2 firmware với nhau qua
+  `splice` (§6.2) → M3 gặp nhau một lần để cắm UART thật. M2 (MQTT tunnel) đã bỏ.
 
-## 9. Câu hỏi mở (chốt ở M0)
+## 9. Quyết định (chốt ở M0, 2026-09-30)
 
-1. **Nhiều node trên một gateway?** v0.2 giả định 1 node. Khi có nhiều node thì LWT không đủ (§5.3), phải thêm
-   địa chỉ node vào frame (UART chung → RS485), và cần thêm một topic `status` cho chính gateway.
-2. **Có cần ack ở tầng link cho COMMAND** (retry trong khoảng 1 s thay vì để backend timeout 10 s)? Đề xuất: chưa cần với UART.
-3. Chu kỳ gửi lại TIME (đề xuất 10 phút) và mức sai giờ chấp nhận được.
-4. Chân UART, baud rate, có cần RTS/CTS không.
-5. ~~Cách tổ chức 2 firmware~~ → 1 thư mục `device/`, `env:node` / `env:gateway` + `build_src_filter` (§7), đã có cả
-   2 env. Còn chờ người làm gateway đồng ý.
-6. Có làm MQTT tunnel (§6.3) không, hay chỉ dùng fake peer + gặp nhau ở M3.
-7. Gateway có hiển thị gì không (LED trạng thái Wi-Fi/MQTT/link)?
+1. **Một node trên một gateway.** Nhiều node cần địa chỉ node trong frame (UART chung → RS485), topic `status` riêng
+   cho gateway, và LWT không còn đủ (§5.3): gần như làm lại protocol, cho thứ một phòng chưa cần.
+2. **Không có ack ở tầng link cho COMMAND.** UART ngắn gần như không mất frame; đứt link thì backend đã thấy offline
+   (`cut 20` qua `splice`), còn command mất thì backend tự timeout sau 10 s. Retry ở link sẽ chồng lên tầng đó.
+3. **Gửi lại TIME mỗi 10 phút; sai giờ chấp nhận được < 1 s.** Đồng hồ ESP32 lệch cỡ vài chục ppm, tức dưới 0.1 s
+   trong 10 phút; biểu đồ 15 phút không cần chính xác hơn.
+4. **UART1, GPIO4 (RX) / GPIO5 (TX), 115200 8N1, không RTS/CTS.** Frame lớn nhất ~90 ms, buffer UART 2 KB lớn hơn
+   một frame (§6.1).
+5. **Một thư mục `device/`, `env:node` / `env:gateway` + `build_src_filter`** (§7). Cả 2 env đã chạy với nhau trong
+   Wokwi qua `splice`.
+6. **Bỏ M2 (MQTT tunnel trong firmware).** `splice` + 2 simulator đã test tích hợp 2 firmware trên một máy (§6.2);
+   `tunnel:` chỉ còn trong link-sim (§6.3).
+7. **Gateway có LED RGB onboard** báo Wi-Fi / MQTT / node (§5.5).
+
+Ngoài phạm vi v0.2: ESP-NOW (§6.4), OTA qua link. Đổi các điểm trên = sửa tài liệu này theo quy trình §8.
