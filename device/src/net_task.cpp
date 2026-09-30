@@ -1,10 +1,27 @@
-#include "net_task.h"
+// Single-board uplink (spec §6.4, D11): Wi-Fi, NTP and MQTT run in a FreeRTOS task
+// pinned to core 0, so a blocking connect never stalls the sensor/rule loop on core 1.
+// Only this task touches the PubSubClient. loop() talks to it through queues:
+//
+//   loop() ── net::publish() ──▶ outQueue (16, drop oldest) ──▶ MQTT publish
+//   MQTT command topic ──▶ cmdQueue (4) ── net::popCommand() ──▶ loop()
+//
+// The net task never builds payloads (only the static LWT) and empties outQueue when
+// the connection drops, so nothing stale is sent on reconnect (D8).
+
+#include "net.h"
 
 #include <Arduino.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <atomic>
 #include <time.h>
+
+struct NetMessage {
+    char topic[MQTT_TOPIC_MAX];
+    char payload[MQTT_PAYLOAD_MAX];
+    uint16_t len;
+    bool retain;
+};
 
 static WiFiClient wifiClient;
 static PubSubClient mqtt(wifiClient);
@@ -20,12 +37,15 @@ static std::atomic<uint32_t> dropped{0};
 
 static char statusTopic[MQTT_TOPIC_MAX];
 static char commandTopic[MQTT_TOPIC_MAX];
+static char telemetryTopic[MQTT_TOPIC_MAX];
+static char eventTopic[MQTT_TOPIC_MAX];
+static char ackTopic[MQTT_TOPIC_MAX];
 static const char kClientId[] = "dev-" DEVICE_ID;
 static const char kLwtPayload[] = "{\"v\":1,\"deviceId\":\"" DEVICE_ID "\",\"online\":false}";
 
 // Only the net task uses these (the MQTT callback runs inside mqtt.loop()).
 static NetMessage txItem;
-static NetMessage rxItem;
+static NetCommand rxItem;
 
 // Wrap-safe "now has reached `at`".
 static bool due(uint32_t now, uint32_t at) { return (int32_t)(now - at) >= 0; }
@@ -53,8 +73,6 @@ static void onMessage(char* topic, byte* payload, unsigned int len) {
     memcpy(rxItem.payload, payload, n);
     rxItem.payload[n] = '\0';
     rxItem.len = n;
-    strlcpy(rxItem.topic, topic, sizeof(rxItem.topic));
-    rxItem.retain = false;
     if (xQueueSend(cmdQueue, &rxItem, 0) != pdTRUE) Serial.println("[mqtt] command queue full, dropped");
 }
 
@@ -200,30 +218,49 @@ static void netTask(void*) {
 
 namespace net {
 
-void begin() {
+void begin(const char*) {
     snprintf(statusTopic, sizeof(statusTopic), "%s/%s/status", MQTT_TOPIC_PREFIX, DEVICE_ID);
     snprintf(commandTopic, sizeof(commandTopic), "%s/%s/command", MQTT_TOPIC_PREFIX, DEVICE_ID);
+    snprintf(telemetryTopic, sizeof(telemetryTopic), "%s/%s/telemetry", MQTT_TOPIC_PREFIX, DEVICE_ID);
+    snprintf(eventTopic, sizeof(eventTopic), "%s/%s/event", MQTT_TOPIC_PREFIX, DEVICE_ID);
+    snprintf(ackTopic, sizeof(ackTopic), "%s/%s/command/ack", MQTT_TOPIC_PREFIX, DEVICE_ID);
     loopTask = xTaskGetCurrentTaskHandle();
     outQueue = xQueueCreate(OUT_QUEUE_DEPTH, sizeof(NetMessage));
-    cmdQueue = xQueueCreate(CMD_QUEUE_DEPTH, sizeof(NetMessage));
+    cmdQueue = xQueueCreate(CMD_QUEUE_DEPTH, sizeof(NetCommand));
     xTaskCreatePinnedToCore(netTask, "net_task", NET_TASK_STACK, nullptr, NET_TASK_PRIORITY, nullptr,
                             NET_TASK_CORE);
 }
 
+void poll(uint32_t) {}
+
 bool online() { return netOnline; }
 bool timeSynced() { return ntpSynced; }
 int rssi() { return lastRssi; }
-uint32_t droppedCount() { return dropped; }
+
+void printStats() {
+    Serial.printf("[net] mqtt=%s ntp=%s rssi=%d dropped=%lu\n", netOnline ? "up" : "down",
+                  ntpSynced ? "synced" : "no", (int)lastRssi, (unsigned long)dropped);
+}
 
 bool takeConnected() { return ulTaskNotifyTake(pdTRUE, 0) > 0; }
 
-bool publish(const char* topic, const char* payload, size_t len, bool retain) {
+static const char* topicFor(Channel ch) {
+    switch (ch) {
+        case Channel::Telemetry: return telemetryTopic;
+        case Channel::Status: return statusTopic;
+        case Channel::Event: return eventTopic;
+        case Channel::Ack: return ackTopic;
+    }
+    return telemetryTopic;
+}
+
+bool publish(Channel ch, const char* payload, size_t len) {
     static NetMessage item;  // loop() is the only producer
-    if (strlen(topic) >= sizeof(item.topic) || len > sizeof(item.payload)) return false;
-    strcpy(item.topic, topic);
+    if (len > sizeof(item.payload)) return false;
+    strcpy(item.topic, topicFor(ch));
     memcpy(item.payload, payload, len);
     item.len = len;
-    item.retain = retain;
+    item.retain = ch == Channel::Status;
     if (xQueueSend(outQueue, &item, 0) != pdTRUE) {
         static NetMessage oldest;  // §6.4 "drop oldest": receive one, then send again
         if (xQueueReceive(outQueue, &oldest, 0) == pdTRUE) dropped++;
@@ -232,6 +269,6 @@ bool publish(const char* topic, const char* payload, size_t len, bool retain) {
     return true;
 }
 
-bool popCommand(NetMessage& out) { return xQueueReceive(cmdQueue, &out, 0) == pdTRUE; }
+bool popCommand(NetCommand& out) { return xQueueReceive(cmdQueue, &out, 0) == pdTRUE; }
 
 }  // namespace net

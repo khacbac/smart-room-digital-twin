@@ -23,7 +23,7 @@ Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
 
 | Thư mục | Nội dung | Trạng thái |
 |---|---|---|
-| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: codec link gateway ⇄ node (chưa nối vào firmware) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp |
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: link gateway ⇄ node; `env:node` = firmware mạch node (không Wi-Fi, uplink qua UART1) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp, `env:node` build được nhưng chưa chạy trên mạch thật |
 | `broker/` | Config Mosquitto local | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
 | `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
@@ -54,6 +54,8 @@ Thiết bị, chọn một trong hai:
 - **Không cần Wokwi:** `pnpm --filter @srdt/server fake-device` (terminal 4). Gõ `hot` / `smoke` / `calm` + Enter
   để đẩy giá trị lên WARNING/DANGER hoặc về NORMAL.
 - **Wokwi:** `cd device && pio run -e esp32-s3`, rồi trong VS Code mở `device/` → `F1 → Wokwi: Start Simulator`.
+- **Mạch node (2 mạch):** `cd device && pio run -e node -t upload`, nối adapter USB-UART vào GPIO4 (RX) / GPIO5 (TX) + GND,
+  rồi `pnpm --filter @srdt/link-sim fake-gateway --link serial:COMx` ([docs/link-protocol.md](docs/link-protocol.md) §6.2).
 
 Kiểm tra nhanh bằng curl:
 

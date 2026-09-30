@@ -58,6 +58,21 @@
 
 #define COMMAND_DEDUP_SIZE 16     // §5.7: last N commandIds with their ack result
 
+// ---- Gateway link (env node only, docs/link-protocol.md §6.1) --------------
+// UART1 on free pins, cross-wired to the gateway (TX → RX, RX → TX, common GND).
+// For solo dev, a USB-UART adapter on the same pins + tools/link-sim fake-gateway.
+
+#ifndef PIN_LINK_RX
+#define PIN_LINK_RX 4
+#endif
+#ifndef PIN_LINK_TX
+#define PIN_LINK_TX 5
+#endif
+#ifndef LINK_BAUD
+#define LINK_BAUD 115200
+#endif
+#define LINK_UART_BUFFER 2048     // each way, > one max stream frame (1035 B)
+
 // ---- Pins (§4.4, must match diagram.json) ----------------------------------
 
 #define PIN_LDR 1          // ADC1_CH0 (ADC2 is unusable while Wi-Fi is active)

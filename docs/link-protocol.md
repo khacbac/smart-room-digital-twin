@@ -217,8 +217,10 @@ Broker gửi lại QoS 1 thì node nhận lại cùng `commandId`. `CommandHandl
   chỉ dùng vài phần trăm băng thông.
 - Nối chéo TX ↔ RX, **chung GND**, cả 2 đều 3.3 V. Dây dài hơn ~1 m thì cân nhắc RS485.
 - Dùng **UART1/UART2** cho link, **không** dùng USB serial (`Serial`), vì USB serial đang dành cho log và
-  lệnh debug. Chân cụ thể ghi vào `include/config.h` của từng firmware ❓.
-- Node đọc UART **không chặn** trong `loop()` (đọc hết `available()` mỗi vòng, đẩy vào `StreamDecoder`).
+  lệnh debug. Node (`env:node`): **UART1, RX = GPIO4, TX = GPIO5** (`PIN_LINK_RX/TX` trong `include/config.h`,
+  đổi được bằng `-D`). Chân của gateway ❓.
+- Node đọc UART **không chặn** trong `loop()` (đọc hết `available()` mỗi vòng, đẩy vào `StreamDecoder`). Buffer
+  UART 2 KB mỗi chiều, lớn hơn một frame lớn nhất, nên gửi một frame cũng không phải chờ.
 
 ### 6.2 USB serial tới PC (mỗi người dev một mình)
 
@@ -277,8 +279,13 @@ device/
     link_frame.h/.cpp     frame, CRC-16, COBS, StreamDecoder              ✅ có test
     link_peer.h/.cpp      TxTracker (seq, heartbeat), PeerMonitor (presence) ✅ có test
     link_messages.h/.cpp  HELLO / TIME / LINK_STATE (ArduinoJson)          ✅ có test
+    link_node.h/.cpp      NodeLink: đăng ký, mqttUp, status còn nợ (§4.3)  ✅ có test
   test/test_link/         22 test, gồm các vector mẫu ở §3.4
-  (sắp tới) node/, gateway/ hoặc env PlatformIO riêng cho từng mạch ❓
+  test/test_link_node/    10 test, cùng kịch bản với tools/link-sim/test/bridge.test.ts
+  src/net.h               uplink mà main.cpp thấy: publish(Channel), popCommand, online …
+  src/net_task.cpp        env:esp32-s3 (1 mạch): Wi-Fi + MQTT như trước
+  src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi
+  (sắp tới) env:gateway
 tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
   src/gateway.ts, node.ts              logic §4–§5, test được với đồng hồ giả
@@ -289,6 +296,8 @@ tools/link-sim/           @srdt/link-sim
 
 - `lib/link` là C++ thuần: không `Arduino.h`, không heap. Buffer `StreamDecoder` khoảng 2.1 KB; `encodeStream` dùng khoảng 1 KB stack.
 - Namespace là `lnk`, vì `link` trùng với hàm POSIX `link()`.
+- Firmware node **dùng chung** `main.cpp`, `sensors`, `actuators`, `display`, edge rules với bản 1 mạch. Chỉ khác
+  uplink: `build_src_filter` chọn `net_link.cpp` thay cho `net_task.cpp`. Sửa rule hay payload thì cả 2 bản cùng có.
 - Hằng số chỉnh bằng `-D`: `LINK_PAYLOAD_MAX` (1024), `LINK_HEARTBEAT_MS` (5000), `LINK_PEER_TIMEOUT_MS` (15000).
 
 ## 8. Quy trình làm việc 2 người
@@ -306,6 +315,7 @@ tools/link-sim/           @srdt/link-sim
 2. **Có cần ack ở tầng link cho COMMAND** (retry trong khoảng 1 s thay vì để backend timeout 10 s)? Đề xuất: chưa cần với UART.
 3. Chu kỳ gửi lại TIME (đề xuất 10 phút) và mức sai giờ chấp nhận được.
 4. Chân UART, baud rate, có cần RTS/CTS không.
-5. Cách tổ chức 2 firmware: 2 thư mục PlatformIO riêng, hay 1 thư mục với `env:node` / `env:gateway` + `build_src_filter`.
+5. ~~Cách tổ chức 2 firmware~~ → đang làm theo hướng 1 thư mục `device/`, `env:node` / `env:gateway` + `build_src_filter`
+   (§7). Còn chờ người làm gateway đồng ý.
 6. Có làm MQTT tunnel (§6.3) không, hay chỉ dùng fake peer + gặp nhau ở M3.
 7. Gateway có hiển thị gì không (LED trạng thái Wi-Fi/MQTT/link)?

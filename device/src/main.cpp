@@ -1,9 +1,10 @@
 // Phase 3 MQTT communication (spec §19).
 // Sensors → lib/edge_rules (smoothing, DHT fault, state machine, override) → LEDs,
 // buzzer, servo and LCD (§7.6, §7.7). Non-blocking millis() scheduling as in §7.1.
-// Network I/O runs in net_task on core 0 (D11); this loop only builds payloads
-// (lib/protocol), queues them, and handles commands popped from the command queue.
-// The serial console still drives the overrides locally.
+// This loop only builds payloads (lib/protocol), hands them to the uplink (net.h) and
+// handles the commands it returns. The uplink is MQTT on this board (net_task, env
+// esp32-s3) or the UART link to a gateway (net_link, env node). The serial console
+// still drives the overrides locally.
 
 #include <Arduino.h>
 #include <esp_system.h>
@@ -17,7 +18,7 @@
 #include "display.h"
 #include "edge_rules.h"
 #include "lcd_format.h"
-#include "net_task.h"
+#include "net.h"
 #include "payloads.h"
 #include "sensors.h"
 
@@ -91,16 +92,12 @@ static void printEvent(const edge::Event& e) {
     Serial.println();
 }
 
-// ---- MQTT payloads (§5), queued for net_task ---------------------------------------
+// ---- MQTT payloads (§5), handed to the uplink --------------------------------------
 
 static char bootId[9];
 static uint32_t seq = 0;  // §5.1: shared by telemetry and events, only incremented here
 static bool bootSent = false;
 
-static char topicTelemetry[MQTT_TOPIC_MAX];
-static char topicStatus[MQTT_TOPIC_MAX];
-static char topicEvent[MQTT_TOPIC_MAX];
-static char topicAck[MQTT_TOPIC_MAX];
 static char payload[MQTT_PAYLOAD_MAX + 1];
 
 // What a status publish reports, to publish right after it changes (§5.4).
@@ -135,19 +132,29 @@ static proto::Meta meta(bool nextSeq) {
     return m;
 }
 
-static void send(const char* topic, size_t len, bool retain) {
+static const char* channelName(Channel ch) {
+    switch (ch) {
+        case Channel::Telemetry: return "telemetry";
+        case Channel::Status: return "status";
+        case Channel::Event: return "event";
+        case Channel::Ack: return "ack";
+    }
+    return "?";
+}
+
+static void send(Channel ch, size_t len) {
     if (len == 0) {
-        Serial.printf("[mqtt] payload for %s too large, dropped\n", topic);
+        Serial.printf("[mqtt] %s payload too large, dropped\n", channelName(ch));
         return;
     }
-    net::publish(topic, payload, len, retain);
+    net::publish(ch, payload, len);
 }
 
 // D8: nothing is built or queued while offline (so no seq is used either).
 
 static void publishTelemetry() {
     if (!net::online()) return;
-    send(topicTelemetry, proto::buildTelemetry(engine, meta(true), payload, sizeof(payload)), false);
+    send(Channel::Telemetry, proto::buildTelemetry(engine, meta(true), payload, sizeof(payload)));
 }
 
 static void publishStatus(uint32_t nowMs) {
@@ -155,12 +162,12 @@ static void publishStatus(uint32_t nowMs) {
     lastStatusAt = nowMs;
     if (!net::online()) return;
     const proto::StatusInfo info{FW_VERSION, (uint32_t)(esp_timer_get_time() / 1000000), net::rssi()};
-    send(topicStatus, proto::buildStatus(engine, meta(false), info, nowMs, payload, sizeof(payload)), true);
+    send(Channel::Status, proto::buildStatus(engine, meta(false), info, nowMs, payload, sizeof(payload)));
 }
 
 static void publishEvent(const edge::Event& e) {
     if (!net::online()) return;
-    send(topicEvent, proto::buildEvent(e, meta(true), payload, sizeof(payload)), false);
+    send(Channel::Event, proto::buildEvent(e, meta(true), payload, sizeof(payload)));
 }
 
 static const char* resetReasonName(esp_reset_reason_t r) {
@@ -184,19 +191,18 @@ static void onConnected(uint32_t nowMs) {
     publishStatus(nowMs);
     if (bootSent) return;
     bootSent = true;
-    send(topicEvent,
-         proto::buildBootEvent(meta(true), FW_VERSION, resetReasonName(esp_reset_reason()), payload, sizeof(payload)),
-         false);
+    send(Channel::Event,
+         proto::buildBootEvent(meta(true), FW_VERSION, resetReasonName(esp_reset_reason()), payload, sizeof(payload)));
 }
 
 // §5.6 / §5.7: validate → execute → status (retained) → ack (§6.6).
-static void handleMqttCommand(const NetMessage& msg, uint32_t nowMs) {
+static void handleMqttCommand(const NetCommand& msg, uint32_t nowMs) {
     const proto::CommandResult r = commands.handle(engine, msg.payload, msg.len, nowMs);
     if (!r.ackable) {
         Serial.printf("[cmd] rejected, no parsable commandId: %.64s\n", msg.payload);
         if (net::online()) {
-            send(topicEvent, proto::buildCommandRejectedEvent(meta(true), msg.payload, msg.len, payload, sizeof(payload)),
-                 false);
+            send(Channel::Event,
+                 proto::buildCommandRejectedEvent(meta(true), msg.payload, msg.len, payload, sizeof(payload)));
         }
         return;
     }
@@ -204,7 +210,7 @@ static void handleMqttCommand(const NetMessage& msg, uint32_t nowMs) {
     Serial.printf("[cmd] %s -> %s%s%s%s\n", r.commandId, proto::ackStatusName(r.status), reason ? " " : "",
                   reason ? reason : "", r.duplicate ? " (duplicate, not re-executed)" : "");
     if (r.executed) publishStatus(nowMs);
-    if (net::online()) send(topicAck, proto::buildAck(engine, meta(false), r, nowMs, payload, sizeof(payload)), false);
+    if (net::online()) send(Channel::Ack, proto::buildAck(engine, meta(false), r, nowMs, payload, sizeof(payload)));
 }
 
 // ---- Serial console: local stand-in for MQTT commands (§5.6) --------------------
@@ -215,7 +221,7 @@ static void printHelp() {
         "  help           this text\n"
         "  s              state + raw sensor values now\n"
         "  log 0|1        periodic [edge] line off/on\n"
-        "  net            network state (MQTT, NTP, RSSI, queue drops)\n"
+        "  net            uplink state (MQTT or gateway link, clock, RSSI, drops)\n"
         "  open [1-90]    OPEN_WINDOW (default 90) → window override\n"
         "  close          CLOSE_WINDOW → window override\n"
         "  buzz on|off    BUZZER_ON / BUZZER_OFF → buzzer override\n"
@@ -234,9 +240,8 @@ static void handleCommand(char* line, uint32_t nowMs) {
         printState(nowMs);
         printRaw();
     } else if (!strcmp(cmd, "net")) {
-        Serial.printf("[net] mqtt=%s ntp=%s rssi=%d bootId=%s seq=%lu dropped=%lu\n", net::online() ? "up" : "down",
-                      net::timeSynced() ? "synced" : "no", net::rssi(), bootId, (unsigned long)seq,
-                      (unsigned long)net::droppedCount());
+        Serial.printf("[net] bootId=%s seq=%lu\n", bootId, (unsigned long)seq);
+        net::printStats();
     } else if (!strcmp(cmd, "log") && arg) {
         stateLog = atoi(arg) != 0;
     } else if (!strcmp(cmd, "open")) {
@@ -306,11 +311,6 @@ void setup() {
     Serial.printf("\n[boot] fw=%s device=%s bootId=%s reset=%s\n", FW_VERSION, DEVICE_ID, bootId,
                   resetReasonName(esp_reset_reason()));
 
-    snprintf(topicTelemetry, sizeof(topicTelemetry), "%s/%s/telemetry", MQTT_TOPIC_PREFIX, DEVICE_ID);
-    snprintf(topicStatus, sizeof(topicStatus), "%s/%s/status", MQTT_TOPIC_PREFIX, DEVICE_ID);
-    snprintf(topicEvent, sizeof(topicEvent), "%s/%s/event", MQTT_TOPIC_PREFIX, DEVICE_ID);
-    snprintf(topicAck, sizeof(topicAck), "%s/%s/command/ack", MQTT_TOPIC_PREFIX, DEVICE_ID);
-
     actuators::begin();
     sensors::begin();
     display::begin();
@@ -328,12 +328,13 @@ void setup() {
     lastStatusAt = now;
     printHelp();
 
-    net::begin();  // after the engine: commands may arrive as soon as MQTT is up
+    net::begin(bootId);  // after the engine: commands may arrive as soon as the uplink is up
 }
 
 void loop() {
     const uint32_t now = millis();
 
+    net::poll(now);
     if (net::takeConnected()) onConnected(now);
 
     pollConsole(now);
@@ -361,7 +362,7 @@ void loop() {
         engine.evaluate(now);  // §7.1: after each sample
     }
 
-    static NetMessage cmd;
+    static NetCommand cmd;
     while (net::popCommand(cmd)) handleMqttCommand(cmd, now);
 
     applyOutputs(engine.tick(now));
