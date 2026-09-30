@@ -1,5 +1,7 @@
 // Single-board uplink (spec §6.4, D11): Wi-Fi, NTP and MQTT run in a FreeRTOS task
 // pinned to core 0, so a blocking connect never stalls the sensor/rule loop on core 1.
+// env:gateway uses it unchanged, with the link bridge as loop(); its Last Will is the
+// offline status lnk::buildOffline() also builds.
 // Only this task touches the PubSubClient. loop() talks to it through queues:
 //
 //   loop() ── net::publish() ──▶ outQueue (16, drop oldest) ──▶ MQTT publish

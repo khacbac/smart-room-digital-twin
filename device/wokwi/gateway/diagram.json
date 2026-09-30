@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "author": "smart-room",
+  "editor": "wokwi",
+  "parts": [
+    {"type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {}}
+  ],
+  "connections": [
+    ["esp:5", "$serialMonitor:RX", "cyan", []],
+    ["esp:4", "$serialMonitor:TX", "cyan", []]
+  ],
+  "dependencies": {}
+}

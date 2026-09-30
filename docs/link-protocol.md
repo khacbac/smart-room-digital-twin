@@ -220,7 +220,7 @@ Broker gửi lại QoS 1 thì node nhận lại cùng `commandId`. `CommandHandl
 - Nối chéo TX ↔ RX, **chung GND**, cả 2 đều 3.3 V. Dây dài hơn ~1 m thì cân nhắc RS485.
 - Dùng **UART1/UART2** cho link, **không** dùng USB serial (`Serial`), vì USB serial đang dành cho log và
   lệnh debug. Node (`env:node`): **UART1, RX = GPIO4, TX = GPIO5** (`PIN_LINK_RX/TX` trong `include/config.h`,
-  đổi được bằng `-D`). Chân của gateway ❓.
+  đổi được bằng `-D`). Gateway (`env:gateway`) dùng **cùng chân** đó, nối chéo: TX node → RX gateway và ngược lại.
 - Node đọc UART **không chặn** trong `loop()` (đọc hết `available()` mỗi vòng, đẩy vào `StreamDecoder`). Buffer
   UART 2 KB mỗi chiều, lớn hơn một frame lớn nhất, nên gửi một frame cũng không phải chờ.
 
@@ -273,6 +273,19 @@ pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
 - fake-gateway nối trước hay sau khi simulator chạy đều được, vì `tcp`/`rfc2217` tự nối lại mỗi 1 s. Nếu node đã boot
   xong mà HELLO bị mất, LINK_STATE không có bootId sẽ làm node gửi lại HELLO (§5.2).
 
+**Gateway trong Wokwi** ([`device/wokwi/gateway/`](../device/wokwi/gateway)): chỉ có board, `$serialMonitor` trên GPIO4/5,
+RFC 2217 ở cổng **4001**. Wi-Fi và MQTT đi như bản 1 mạch (Wokwi-GUEST → `host.wokwi.internal`, broker trên máy).
+fake-node đóng vai node:
+
+```sh
+cd device && pio run -e gateway
+# VS Code: F1 → "Wokwi: Select Config File" → device/wokwi/gateway/wokwi.toml, rồi "Wokwi: Start Simulator"
+pnpm --filter @srdt/link-sim fake-node --link rfc2217:127.0.0.1:4001
+```
+
+Cũng không thấy console của gateway. Theo dõi qua log fake-node, backend và dashboard (node lên online, telemetry chạy,
+command từ dashboard có ack).
+
 ### 6.3 MQTT tunnel (test tích hợp từ xa, M2)
 
 Hai mạch thật ở 2 nơi, cùng kết nối Wi-Fi tới một broker cloud (HiveMQ Cloud / EMQX Serverless, có TLS + user).
@@ -305,10 +318,11 @@ device/
   test/test_link_node/    10 test, cùng kịch bản với tools/link-sim/test/bridge.test.ts
   test/test_link_gateway/ 18 test: 13 cho GatewayLink, 5 nối NodeLink ⇄ GatewayLink qua stream codec
   src/net.h               uplink mà main.cpp thấy: publish(Channel), popCommand, online …
-  src/net_task.cpp        env:esp32-s3 (1 mạch): Wi-Fi + MQTT như trước
+  src/net_task.cpp        env:esp32-s3 (1 mạch) và env:gateway: Wi-Fi + NTP + MQTT như trước, không sửa
   src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi
+  src/gateway/main.cpp    env:gateway: UART1 ⇄ GatewayLink ⇄ net_task, console `stats`; không cảm biến, không main.cpp
   wokwi/node/             wokwi.toml + diagram.json cho env:node, UART link ra RFC 2217 :4000 (§6.2)
-  (sắp tới) env:gateway
+  wokwi/gateway/          như trên cho env:gateway (chỉ có board), RFC 2217 :4001
 tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
   src/gateway.ts, node.ts              logic §4–§5, test được với đồng hồ giả
@@ -338,7 +352,7 @@ tools/link-sim/           @srdt/link-sim
 2. **Có cần ack ở tầng link cho COMMAND** (retry trong khoảng 1 s thay vì để backend timeout 10 s)? Đề xuất: chưa cần với UART.
 3. Chu kỳ gửi lại TIME (đề xuất 10 phút) và mức sai giờ chấp nhận được.
 4. Chân UART, baud rate, có cần RTS/CTS không.
-5. ~~Cách tổ chức 2 firmware~~ → đang làm theo hướng 1 thư mục `device/`, `env:node` / `env:gateway` + `build_src_filter`
-   (§7). Còn chờ người làm gateway đồng ý.
+5. ~~Cách tổ chức 2 firmware~~ → 1 thư mục `device/`, `env:node` / `env:gateway` + `build_src_filter` (§7), đã có cả
+   2 env. Còn chờ người làm gateway đồng ý.
 6. Có làm MQTT tunnel (§6.3) không, hay chỉ dùng fake peer + gặp nhau ở M3.
 7. Gateway có hiển thị gì không (LED trạng thái Wi-Fi/MQTT/link)?

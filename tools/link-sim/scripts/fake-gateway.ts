@@ -9,6 +9,7 @@ import { openLink } from "../src/transport";
 //
 //   pnpm --filter @srdt/link-sim fake-gateway                         tcp-listen:7000 ⇄ mqtt://127.0.0.1:1883
 //   pnpm --filter @srdt/link-sim fake-gateway --link serial:COM5      the node board on a USB-UART adapter
+//   pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000  env:node in Wokwi (device/wokwi/node)
 //   pnpm --filter @srdt/link-sim fake-gateway --mqtt none             no broker
 //
 // env: MQTT_URL, MQTT_TOPIC_PREFIX, DEVICE_ID (same as server/.env)

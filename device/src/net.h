@@ -4,6 +4,7 @@
 // Two implementations, picked by the PlatformIO env (build_src_filter):
 //
 //   net_task.cpp  env:esp32-s3  single board: Wi-Fi + MQTT + NTP in a task on core 0 (D11)
+//                 env:gateway   the same, driven by src/gateway/main.cpp instead of main.cpp
 //   net_link.cpp  env:node      node board: frames to the gateway over UART
 //                               (docs/link-protocol.md), serviced from loop()
 //

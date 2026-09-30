@@ -58,9 +58,10 @@
 
 #define COMMAND_DEDUP_SIZE 16     // §5.7: last N commandIds with their ack result
 
-// ---- Gateway link (env node only, docs/link-protocol.md §6.1) --------------
-// UART1 on free pins, cross-wired to the gateway (TX → RX, RX → TX, common GND).
-// For solo dev, a USB-UART adapter on the same pins + tools/link-sim fake-gateway.
+// ---- Gateway ⇄ node link (env node and gateway, docs/link-protocol.md §6.1) -
+// UART1 on the same free pins on both boards, cross-wired (TX → RX, RX → TX, common
+// GND). For solo dev, a USB-UART adapter on these pins + tools/link-sim fake-gateway
+// (on the node) or fake-node (on the gateway).
 
 #ifndef PIN_LINK_RX
 #define PIN_LINK_RX 4

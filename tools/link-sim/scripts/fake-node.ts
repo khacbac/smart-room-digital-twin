@@ -8,6 +8,7 @@ import { describeFrame, openLink } from "../src/transport";
 //
 //   pnpm --filter @srdt/link-sim fake-node                            tcp:127.0.0.1:7000 (fake-gateway)
 //   pnpm --filter @srdt/link-sim fake-node --link serial:COM6         the gateway board on a USB-UART adapter
+//   pnpm --filter @srdt/link-sim fake-node --link rfc2217:127.0.0.1:4001  env:gateway in Wokwi (device/wokwi/gateway)
 //   pnpm --filter @srdt/link-sim fake-node --link tunnel:mqtts://u:p@host:8883
 //
 // env: DEVICE_ID

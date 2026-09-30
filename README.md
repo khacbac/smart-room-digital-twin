@@ -23,7 +23,7 @@ Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
 
 | Thư mục | Nội dung | Trạng thái |
 |---|---|---|
-| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: link gateway ⇄ node; `env:node` = firmware mạch node (không Wi-Fi, uplink qua UART1) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp, `env:node` build được nhưng chưa chạy trên mạch thật |
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: link gateway ⇄ node; `env:node` = firmware mạch node (không Wi-Fi, uplink qua UART1); `env:gateway` = mạch gateway (Wi-Fi + MQTT, bridge sang node qua UART1) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp, `env:node` đã chạy trong Wokwi, `env:gateway` mới build được; chưa chạy trên mạch thật |
 | `broker/` | Config Mosquitto local | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
 | `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
@@ -59,6 +59,9 @@ Thiết bị, chọn một trong hai:
 - **Mạch node trong Wokwi:** `cd device && pio run -e node`, `F1 → Wokwi: Select Config File` → `device/wokwi/node/wokwi.toml`
   → `Wokwi: Start Simulator`, rồi `pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000`
   (serial monitor dành cho link, nên không thấy log của node).
+- **Mạch gateway (2 mạch):** `pio run -e gateway -t upload`, cùng chân GPIO4/5, rồi
+  `pnpm --filter @srdt/link-sim fake-node --link serial:COMx`. Trong Wokwi: config `device/wokwi/gateway/wokwi.toml`
+  và `fake-node --link rfc2217:127.0.0.1:4001`.
 
 Kiểm tra nhanh bằng curl:
 
