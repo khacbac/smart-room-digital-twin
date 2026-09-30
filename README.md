@@ -23,7 +23,7 @@ Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
 
 | Thư mục | Nội dung | Trạng thái |
 |---|---|---|
-| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: link gateway ⇄ node; `env:node` = firmware mạch node (không Wi-Fi, uplink qua UART1); `env:gateway` = mạch gateway (Wi-Fi + MQTT, bridge sang node qua UART1) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp, `env:node` và `env:gateway` đã chạy trong Wokwi (mỗi mạch với link-sim ở đầu kia); chưa chạy 2 mạch với nhau, chưa chạy trên mạch thật |
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: link gateway ⇄ node; `env:node` = firmware mạch node (không Wi-Fi, uplink qua UART1); `env:gateway` = mạch gateway (Wi-Fi + MQTT, bridge sang node qua UART1) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp, `env:node` và `env:gateway` đã chạy trong Wokwi (mỗi mạch với link-sim ở đầu kia, và 2 mạch với nhau qua `splice`); chưa chạy trên mạch thật |
 | `broker/` | Config Mosquitto local | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
 | `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
@@ -99,7 +99,7 @@ Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_
 - [x] Mosquitto + backend + fake device: device online, telemetry qua SSE mỗi 2 s, `OPEN_WINDOW 45` → `sent` → `executed` (~3 ms)
 - [x] Dashboard (Chrome headless, desktop + mobile 390 px, light/dark): twin hiện góc cửa 45°, buzzer on, nhãn "manual", đếm ngược override
 - [x] `env:gateway-wokwi` trong Wokwi + `fake-node` (rfc2217): HELLO, Wi-Fi, MQTT, NTP → TIME; `die 20` → node lost → offline status → node up; tắt Mosquitto → mqtt down, backoff 1–16 s, reconnect đúng 1 lần `mqtt up`; command từ dashboard → `forwarded` → node `executed`
-- [x] 2 mạch thật trong Wokwi (`node-wokwi` :4002 ⇄ `splice` ⇄ `gateway-wokwi` :4001): dashboard online, telemetry từ cảm biến ảo của node, mở/đóng cửa từ dashboard → servo quay
+- [x] 2 mạch thật trong Wokwi (`node-wokwi` :4002 ⇄ `splice` ⇄ `gateway-wokwi` :4001): dashboard online, telemetry từ cảm biến ảo của node, mở/đóng cửa từ dashboard → servo quay; `cut 20` → cả 2 mạch báo mất link sau 15 s, dashboard offline, nối lại → online; đổi cảm biến ảo của node → WARNING/DANGER lên dashboard
 - [ ] Chưa chạy lại với Wokwi trong repo này (firmware giống hệt smart-room, chỉ đổi prefix `srdt` và dòng LCD khởi động)
 - [ ] Firestore / Firebase Hosting / Cloud Run: chưa làm, xem `docs/cloud.md`
 
