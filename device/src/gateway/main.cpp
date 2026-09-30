@@ -10,6 +10,7 @@
 // has `stats` and `help`.
 
 #include <Arduino.h>
+#include <esp_system.h>
 #include <sys/time.h>
 
 #include "config.h"
@@ -97,15 +98,21 @@ static void pollLink(uint32_t now) {
     }
 }
 
-// MQTT up/down → LINK_STATE. A reconnect between two loops (drop + connect we never saw
-// as down) still flips it, so the node re-sends the status our Last Will replaced.
+// MQTT up/down → LINK_STATE. Up only on the connect notification: net_task sets online()
+// just before it, so reading online() for "up" too would flip the node up, down, up on
+// every connect. A notification while already up is a reconnect we never saw as down
+// (between two loops): down then up, so the node re-sends the status our Last Will replaced.
 static void syncMqtt(uint32_t now) {
-    if (net::takeConnected() && gw.mqttUp()) gw.setMqtt(false, now);
-    const bool up = net::online();
-    if (up == gw.mqttUp()) return;
-    gw.setMqtt(up, now);
-    Serial.printf("[link] mqtt %s → LINK_STATE%s\n", up ? "up" : "down",
-                  up && !gw.nodeUp() ? ", offline status (node down)" : "");
+    if (net::takeConnected()) {
+        const bool missedDrop = gw.mqttUp();
+        if (missedDrop) gw.setMqtt(false, now);
+        gw.setMqtt(true, now);
+        Serial.printf("[link] mqtt up%s → LINK_STATE%s\n", missedDrop ? " (reconnected)" : "",
+                      gw.nodeUp() ? "" : ", offline status (node down)");
+    } else if (gw.mqttUp() && !net::online()) {
+        gw.setMqtt(false, now);
+        Serial.println("[link] mqtt down → LINK_STATE");
+    }
 }
 
 static const char* cmdResultName(lnk::GwCmd r) {
@@ -166,14 +173,29 @@ static void pollConsole() {
 
 // ---- Arduino ------------------------------------------------------------------------
 
+static const char* resetReasonName(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_POWERON: return "POWERON";
+        case ESP_RST_EXT: return "EXT";
+        case ESP_RST_SW: return "SW";
+        case ESP_RST_PANIC: return "PANIC";
+        case ESP_RST_INT_WDT: return "INT_WDT";
+        case ESP_RST_TASK_WDT: return "TASK_WDT";
+        case ESP_RST_WDT: return "WDT";
+        case ESP_RST_BROWNOUT: return "BROWNOUT";
+        default: return "UNKNOWN";
+    }
+}
+
 void setup() {
     Serial.begin(115200);
-    Serial.printf("\n[boot] gateway fw=%s for node %s\n", FW_VERSION, kNodeId);
-
     port.setRxBufferSize(LINK_UART_BUFFER);  // core 2.x: before begin()
     port.setTxBufferSize(LINK_UART_BUFFER);
     port.begin(LINK_BAUD, SERIAL_8N1, PIN_LINK_RX, PIN_LINK_TX);
     port.write((uint8_t)0);  // flush garbage on the node's decoder (§3.2)
+    // After UART1, so the Wokwi build (src/console_tee.cpp) copies it onto the link too.
+    Serial.printf("\n[boot] gateway fw=%s for node %s reset=%s\n", FW_VERSION, kNodeId,
+                  resetReasonName(esp_reset_reason()));
     Serial.printf("[link] UART1 rx=%d tx=%d @%d\n", PIN_LINK_RX, PIN_LINK_TX, LINK_BAUD);
 
     gw.begin(kNodeId, writeFrame, publishUplink, wallClock, millis());  // HELLO_REQUEST

@@ -135,6 +135,11 @@ export function encodeStream(type: Type, seq: number, payload?: Uint8Array): Buf
 export class StreamDecoder {
   readonly stats = { frames: 0, errors: 0, overflows: 0 };
   lastError: DecodeError | null = null;
+  /**
+   * Takes printable chunks (a Wokwi build's console on the link, docs §6.2) instead of
+   * counting them as errors. A frame never passes: its version byte 0x01 is not text.
+   */
+  onText: ((text: Buffer) => void) | null = null;
   private buf = Buffer.alloc(WIRE_MAX - 1);
   private len = 0;
   private overflow = false;
@@ -157,6 +162,10 @@ export class StreamDecoder {
         continue;
       }
       if (n === 0) continue; // idle delimiter
+      if (this.onText && isText(this.buf.subarray(0, n))) {
+        this.onText(Buffer.from(this.buf.subarray(0, n)));
+        continue;
+      }
       const raw = cobsDecode(this.buf.subarray(0, n));
       const result = raw ? decodeRaw(raw) : ({ error: "BAD_COBS" } as const);
       if ("error" in result) {
@@ -173,4 +182,10 @@ export class StreamDecoder {
     this.lastError = error;
     this.stats.errors++;
   }
+}
+
+/** Tab, CR, LF, printable ASCII or UTF-8 bytes only. */
+function isText(bytes: Uint8Array) {
+  for (const b of bytes) if (b < 0x20 ? b !== 0x09 && b !== 0x0a && b !== 0x0d : b === 0x7f) return false;
+  return true;
 }

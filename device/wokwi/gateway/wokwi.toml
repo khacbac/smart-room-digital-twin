@@ -2,11 +2,11 @@
 # Wi-Fi + MQTT go to the local broker like the single board (Wokwi-GUEST, host.wokwi.internal).
 # The one serial port is wired to the link UART (GPIO4/5), not to the console, and served as
 # RFC 2217 on TCP 4001 (4000 is the node's, so both configs can stay open):
-#   pio run -e gateway
+#   pio run -e gateway-wokwi   (env:gateway + its console on the link, printed by link-sim)
 #   (VS Code) "Wokwi: Select Config File" → device/wokwi/gateway/wokwi.toml, then "Wokwi: Start Simulator"
 #   pnpm --filter @srdt/link-sim fake-node --link rfc2217:127.0.0.1:4001
 [wokwi]
 version = 1
-firmware = '../../.pio/build/gateway/firmware.bin'
-elf = '../../.pio/build/gateway/firmware.elf'
+firmware = '../../.pio/build/gateway-wokwi/firmware.bin'
+elf = '../../.pio/build/gateway-wokwi/firmware.elf'
 rfc2217ServerPort = 4001

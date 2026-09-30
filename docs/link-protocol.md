@@ -258,7 +258,7 @@ Tham số khác: `--node room-01`, `--mqtt`, `--prefix`, `-v` (in cả telemetry
 đưa cổng đó ra TCP. fake-gateway đóng vai gateway:
 
 ```sh
-cd device && pio run -e node
+cd device && pio run -e node-wokwi
 # VS Code: F1 → "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, rồi "Wokwi: Start Simulator"
 pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
 ```
@@ -266,9 +266,12 @@ pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
 - RFC 2217 là telnet: byte 0xFF đi thành `IAC IAC`, và server gửi thêm lệnh negotiation. Frame COBS có thể chứa 0xFF
   (CRC, payload), nên `tcp:` thuần sẽ làm hỏng frame. `rfc2217:` xin chế độ BINARY, escape 0xFF khi gửi, và bỏ lệnh telnet
   khi nhận (`TelnetFilter` trong `src/transport.ts`). Nó không đặt baud qua COM-PORT-OPTION, vì Wokwi không cần.
-- Wokwi chỉ có **một** serial monitor. Ở đây nó dùng cho link, nên **không thấy log và không gõ lệnh console** (UART0) của
-  node. Theo dõi qua log fake-gateway (`-v` để in cả telemetry), `stats`, LCD và dashboard. Muốn xem log node thì dùng
-  bản 1 mạch (`device/wokwi.toml`) hoặc mạch thật.
+- Wokwi chỉ có **một** serial monitor, và ở đây nó dùng cho link. Vì vậy env `node-wokwi` / `gateway-wokwi` (= `node` /
+  `gateway` + `-D LINK_CONSOLE_TEE`, `src/console_tee.cpp`) chép mọi thứ in ra console (UART0) sang UART link, mỗi lần
+  ghi là một chunk riêng kết thúc bằng 0x00. link-sim nhận ra chunk là text (frame luôn có byte version 0x01, không phải
+  text) và in thành dòng `node| …` / `gw| …`. Peer thật sẽ bỏ chunk đó như frame hỏng (§3.2), nên **không nạp bản
+  `*-wokwi` cho mạch thật**. Panic dump đi qua ROM nên không được chép; lần boot sau in `reset=` (PANIC, TASK_WDT…).
+  Vẫn không gõ được lệnh console.
 - Tab simulator phải đang hiện trong VS Code, không thì Wokwi tạm dừng. Khi đó fake-gateway báo node timeout sau 15 s.
 - fake-gateway nối trước hay sau khi simulator chạy đều được, vì `tcp`/`rfc2217` tự nối lại mỗi 1 s. Nếu node đã boot
   xong mà HELLO bị mất, LINK_STATE không có bootId sẽ làm node gửi lại HELLO (§5.2).
@@ -278,13 +281,14 @@ RFC 2217 ở cổng **4001**. Wi-Fi và MQTT đi như bản 1 mạch (Wokwi-GUES
 fake-node đóng vai node:
 
 ```sh
-cd device && pio run -e gateway
+cd device && pio run -e gateway-wokwi
 # VS Code: F1 → "Wokwi: Select Config File" → device/wokwi/gateway/wokwi.toml, rồi "Wokwi: Start Simulator"
 pnpm --filter @srdt/link-sim fake-node --link rfc2217:127.0.0.1:4001
 ```
 
-Cũng không thấy console của gateway. Theo dõi qua log fake-node, backend và dashboard (node lên online, telemetry chạy,
-command từ dashboard có ack).
+Console của gateway hiện trong log fake-node dưới dạng `gw| …` (`[boot] … reset=`, `[wifi]`, `[mqtt]`, `[link]`). Ngoài
+ra theo dõi qua backend và dashboard (node lên online, telemetry chạy, command từ dashboard có ack). Nếu fake-node không
+in `mqtt path up`, gateway chưa tới được broker: xem dòng `gw| [mqtt] …`.
 
 ### 6.3 MQTT tunnel (test tích hợp từ xa, M2)
 
@@ -321,8 +325,9 @@ device/
   src/net_task.cpp        env:esp32-s3 (1 mạch) và env:gateway: Wi-Fi + NTP + MQTT như trước, không sửa
   src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi
   src/gateway/main.cpp    env:gateway: UART1 ⇄ GatewayLink ⇄ net_task, console `stats`; không cảm biến, không main.cpp
-  wokwi/node/             wokwi.toml + diagram.json cho env:node, UART link ra RFC 2217 :4000 (§6.2)
-  wokwi/gateway/          như trên cho env:gateway (chỉ có board), RFC 2217 :4001
+  src/console_tee.cpp     chỉ env *-wokwi: chép console (UART0) sang UART link để link-sim in ra (§6.2)
+  wokwi/node/             wokwi.toml + diagram.json cho env:node-wokwi, UART link ra RFC 2217 :4000 (§6.2)
+  wokwi/gateway/          như trên cho env:gateway-wokwi (chỉ có board), RFC 2217 :4001
 tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
   src/gateway.ts, node.ts              logic §4–§5, test được với đồng hồ giả

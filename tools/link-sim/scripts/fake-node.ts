@@ -25,6 +25,7 @@ const log = (msg: string) => console.log(`${new Date().toISOString().slice(11, 2
 const link = await openLink(args.link, { role: "node", nodeId: args.node, log });
 const node = new NodeSim({ deviceId: args.node, link, log });
 
+link.onConsole?.((line) => log(`gw| ${line}`)); // a *-wokwi build's console
 link.onFrame((f) => {
   if (args.verbose) log(`[node] ← ${describeFrame(f)}`);
   node.onFrame(f);

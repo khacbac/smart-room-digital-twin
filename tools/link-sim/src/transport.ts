@@ -19,6 +19,8 @@ export interface FrameSink {
 export interface LinkTransport extends FrameSink {
   readonly label: string;
   onFrame(cb: (frame: Frame) => void): void;
+  /** Console lines the peer copies onto the link (Wokwi builds, docs §6.2); stream links only. */
+  onConsole?(cb: (line: string) => void): void;
   /** Frames dropped by the decoder (noise, bad CRC …). */
   errors(): number;
   close(): Promise<void>;
@@ -107,6 +109,8 @@ class StreamTransport implements LinkTransport {
   private decoder = new StreamDecoder();
   private codec = rawCodec();
   private handler: (frame: Frame) => void = () => {};
+  private consoleHandler: ((line: string) => void) | null = null;
+  private consoleLine = "";
 
   constructor(
     readonly label: string,
@@ -117,6 +121,8 @@ class StreamTransport implements LinkTransport {
   attach(stream: Duplex) {
     this.stream = stream;
     this.decoder = new StreamDecoder(); // drop half a frame from the previous connection
+    this.consoleLine = "";
+    if (this.consoleHandler) this.decoder.onText = (text) => this.onText(text);
     this.codec = this.makeCodec();
     const start = this.codec.start();
     if (start) stream.write(start);
@@ -141,8 +147,23 @@ class StreamTransport implements LinkTransport {
     this.handler = cb;
   }
 
+  onConsole(cb: (line: string) => void) {
+    this.consoleHandler = cb;
+    this.decoder.onText = (text) => this.onText(text);
+  }
+
   errors() {
     return this.decoder.stats.errors;
+  }
+
+  // One console write per chunk (console_tee.cpp): join them back into lines.
+  private onText(text: Buffer) {
+    const lines = (this.consoleLine + text.toString("utf8")).split("\n");
+    this.consoleLine = lines.pop() ?? "";
+    for (const line of lines) {
+      const l = line.replace(/\r$/, "");
+      if (l) this.consoleHandler?.(l);
+    }
   }
 
   async close() {

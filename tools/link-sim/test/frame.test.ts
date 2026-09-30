@@ -66,6 +66,17 @@ describe("frame codec (twin of lib/link)", () => {
     expect(frame?.payload).toEqual(Buffer.from(big));
   });
 
+  it("stream decoder: console text between frames goes to onText, not to errors", () => {
+    const d = new StreamDecoder();
+    const text: string[] = [];
+    d.onText = (t) => text.push(t.toString("utf8"));
+    const line = Buffer.from("[mqtt] connect failed state=-2 → retry\r\n\0");
+    const frames = d.push(Buffer.concat([line, encodeStream(Type.Heartbeat, 7), Buffer.from([0x5a, 0x01, 0])]));
+    expect(frames.map((f) => f.seq)).toEqual([7]);
+    expect(text).toEqual(["[mqtt] connect failed state=-2 → retry\r\n"]);
+    expect(d.stats.errors).toBe(1); // 0x01 is not text: still noise
+  });
+
   it("link-only JSON matches the firmware bytes", () => {
     expect(buildHello({ deviceId: "room-01", bootId: "a1b2c3d4", fw: "0.2.0" }).toString()).toBe(
       '{"deviceId":"room-01","bootId":"a1b2c3d4","fw":"0.2.0"}',

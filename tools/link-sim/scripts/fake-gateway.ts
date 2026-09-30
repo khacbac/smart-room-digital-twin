@@ -65,6 +65,7 @@ if (args.mqtt === "none") {
 }
 
 bridge = new GatewayBridge({ nodeId, prefix: args.prefix, link, broker, log, verbose: args.verbose });
+link.onConsole?.((line) => log(`node| ${line}`)); // a *-wokwi build's console
 link.onFrame((f) => bridge.onFrame(f));
 if (args.mqtt === "none") bridge.onBrokerUp();
 bridge.start();

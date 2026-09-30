@@ -91,4 +91,22 @@ describe("rfc2217 transport", () => {
     expect(got[0]!.payload).toEqual(payload);
     expect(link.errors()).toBe(0);
   });
+
+  it("joins a peer's console chunks (console_tee.cpp) back into lines", async () => {
+    server = fakeRfc2217Server();
+    const port = await server.listen();
+    link = await openLink(`rfc2217:127.0.0.1:${port}`, { role: "node", nodeId: "room-01", log: () => {} });
+    const lines: string[] = [];
+    const got: Frame[] = [];
+    link.onConsole?.((l) => lines.push(l));
+    link.onFrame((f) => got.push(f));
+    await until(() => server!.opening.length > 0);
+
+    server.uartSend(Buffer.from("[boot] gateway \0"));
+    server.uartSend(encodeStream(Type.LinkState, 1, Buffer.from('{"mqtt":false}')));
+    server.uartSend(Buffer.from("reset=PANIC\r\n\0[wifi] up\n\0"));
+    await until(() => lines.length === 2 && got.length === 1);
+    expect(lines).toEqual(["[boot] gateway reset=PANIC", "[wifi] up"]);
+    expect(link.errors()).toBe(0);
+  });
 });

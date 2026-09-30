@@ -56,12 +56,12 @@ Thiết bị, chọn một trong hai:
 - **Wokwi:** `cd device && pio run -e esp32-s3`, rồi trong VS Code mở `device/` → `F1 → Wokwi: Start Simulator`.
 - **Mạch node (2 mạch):** `cd device && pio run -e node -t upload`, nối adapter USB-UART vào GPIO4 (RX) / GPIO5 (TX) + GND,
   rồi `pnpm --filter @srdt/link-sim fake-gateway --link serial:COMx` ([docs/link-protocol.md](docs/link-protocol.md) §6.2).
-- **Mạch node trong Wokwi:** `cd device && pio run -e node`, `F1 → Wokwi: Select Config File` → `device/wokwi/node/wokwi.toml`
+- **Mạch node trong Wokwi:** `cd device && pio run -e node-wokwi`, `F1 → Wokwi: Select Config File` → `device/wokwi/node/wokwi.toml`
   → `Wokwi: Start Simulator`, rồi `pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000`
-  (serial monitor dành cho link, nên không thấy log của node).
+  (serial monitor dành cho link; bản `*-wokwi` chép console sang link, fake-gateway in thành `node| …`).
 - **Mạch gateway (2 mạch):** `pio run -e gateway -t upload`, cùng chân GPIO4/5, rồi
-  `pnpm --filter @srdt/link-sim fake-node --link serial:COMx`. Trong Wokwi: config `device/wokwi/gateway/wokwi.toml`
-  và `fake-node --link rfc2217:127.0.0.1:4001`.
+  `pnpm --filter @srdt/link-sim fake-node --link serial:COMx`. Trong Wokwi: `pio run -e gateway-wokwi`, config
+  `device/wokwi/gateway/wokwi.toml` và `fake-node --link rfc2217:127.0.0.1:4001` (console gateway hiện thành `gw| …`).
 
 Kiểm tra nhanh bằng curl:
 
