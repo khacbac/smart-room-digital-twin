@@ -246,12 +246,30 @@ pnpm --filter @srdt/link-sim fake-gateway --link serial:COM5
 pnpm --filter @srdt/link-sim fake-node --link serial:COM6
 ```
 
-`--link` nhận `serial:COM5[@115200]`, `tcp-listen:[host:]port`, `tcp:host:port`, `tunnel:<mqtt url>` (§6.3).
+`--link` nhận `serial:COM5[@115200]`, `tcp-listen:[host:]port`, `tcp:host:port`, `rfc2217:host:port` (Wokwi, bên dưới),
+`tunnel:<mqtt url>` (§6.3).
 Tham số khác: `--node room-01`, `--mqtt`, `--prefix`, `-v` (in cả telemetry/heartbeat). Có thể dùng env `DEVICE_ID`,
 `MQTT_URL`, `MQTT_TOPIC_PREFIX` như `server/.env`.
 
-- Wokwi: có thể thử `rfc2217ServerPort` trong `wokwi.toml` để đưa UART của mạch giả lập ra TCP ❓ (chưa thử;
-  RFC 2217 có thêm telnet negotiation nên `tcp:` thuần có thể chưa đủ).
+**Node trong Wokwi, không cần mạch** ([`device/wokwi/node/`](../device/wokwi/node)): cùng linh kiện với
+`device/diagram.json`, nhưng `$serialMonitor` nối vào **UART link (GPIO4/5)** thay cho UART0, và `rfc2217ServerPort = 4000`
+đưa cổng đó ra TCP. fake-gateway đóng vai gateway:
+
+```sh
+cd device && pio run -e node
+# VS Code: F1 → "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, rồi "Wokwi: Start Simulator"
+pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
+```
+
+- RFC 2217 là telnet: byte 0xFF đi thành `IAC IAC`, và server gửi thêm lệnh negotiation. Frame COBS có thể chứa 0xFF
+  (CRC, payload), nên `tcp:` thuần sẽ làm hỏng frame. `rfc2217:` xin chế độ BINARY, escape 0xFF khi gửi, và bỏ lệnh telnet
+  khi nhận (`TelnetFilter` trong `src/transport.ts`). Nó không đặt baud qua COM-PORT-OPTION, vì Wokwi không cần.
+- Wokwi chỉ có **một** serial monitor. Ở đây nó dùng cho link, nên **không thấy log và không gõ lệnh console** (UART0) của
+  node. Theo dõi qua log fake-gateway (`-v` để in cả telemetry), `stats`, LCD và dashboard. Muốn xem log node thì dùng
+  bản 1 mạch (`device/wokwi.toml`) hoặc mạch thật.
+- Tab simulator phải đang hiện trong VS Code, không thì Wokwi tạm dừng. Khi đó fake-gateway báo node timeout sau 15 s.
+- fake-gateway nối trước hay sau khi simulator chạy đều được, vì `tcp`/`rfc2217` tự nối lại mỗi 1 s. Nếu node đã boot
+  xong mà HELLO bị mất, LINK_STATE không có bootId sẽ làm node gửi lại HELLO (§5.2).
 
 ### 6.3 MQTT tunnel (test tích hợp từ xa, M2)
 
@@ -285,11 +303,12 @@ device/
   src/net.h               uplink mà main.cpp thấy: publish(Channel), popCommand, online …
   src/net_task.cpp        env:esp32-s3 (1 mạch): Wi-Fi + MQTT như trước
   src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi
+  wokwi/node/             wokwi.toml + diagram.json cho env:node, UART link ra RFC 2217 :4000 (§6.2)
   (sắp tới) env:gateway
 tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
   src/gateway.ts, node.ts              logic §4–§5, test được với đồng hồ giả
-  src/transport.ts                     serial / tcp / tunnel / memory
+  src/transport.ts                     serial / tcp / rfc2217 / tunnel / memory
   scripts/fake-gateway.ts, fake-node.ts
   test/                                codec + node ⇄ gateway (payload phải qua contracts)
 ```

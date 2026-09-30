@@ -9,6 +9,7 @@ import { type Frame, StreamDecoder, type Type, decodeRaw, encodeRaw, encodeStrea
 //   serial:COM5[@115200]     UART through a USB-UART adapter (§6.1, §6.2)
 //   tcp-listen:[host:]7000   stream frames over TCP, waits for the peer
 //   tcp:host:7000            stream frames over TCP, connects (and reconnects) to the peer
+//   rfc2217:host:4000        like tcp:, through a telnet/RFC 2217 serial server (Wokwi, §6.2)
 //   tunnel:mqtts://u:p@host  raw frames over MQTT topics srdt-link/{nodeId}/up|down (§6.3)
 
 export interface FrameSink {
@@ -25,24 +26,104 @@ export interface LinkTransport extends FrameSink {
 
 type Log = (msg: string) => void;
 
+// ---- Telnet (RFC 854 / 2217) -------------------------------------------------------------
+
+const IAC = 0xff;
+const SB = 0xfa;
+const SE = 0xf0;
+const WILL = 0xfb;
+const DO = 0xfd;
+const BINARY = 0x00;
+
+/** Asks for 8-bit clean data both ways, so no CR NUL / CR LF rewriting (RFC 856). */
+export const TELNET_BINARY = Buffer.from([IAC, WILL, BINARY, IAC, DO, BINARY]);
+
+/** Data byte 0xFF goes out as IAC IAC. */
+export function telnetEscape(data: Buffer): Buffer {
+  if (!data.includes(IAC)) return data;
+  const out: number[] = [];
+  for (const b of data) {
+    out.push(b);
+    if (b === IAC) out.push(IAC);
+  }
+  return Buffer.from(out);
+}
+
+/**
+ * Strips telnet commands from the received bytes, keeping state across chunks.
+ * Option negotiation is ignored: the only option we need is BINARY, which we ask for.
+ */
+export class TelnetFilter {
+  private state: "data" | "iac" | "opt" | "sb" | "sbIac" = "data";
+
+  push(chunk: Buffer): Buffer {
+    const out: number[] = [];
+    for (const b of chunk) {
+      switch (this.state) {
+        case "data":
+          if (b === IAC) this.state = "iac";
+          else out.push(b);
+          break;
+        case "iac":
+          if (b === IAC) {
+            out.push(IAC);
+            this.state = "data";
+          } else if (b >= WILL) this.state = "opt"; // WILL / WONT / DO / DONT <option>
+          else if (b === SB) this.state = "sb";
+          else this.state = "data"; // NOP, BREAK …
+          break;
+        case "opt":
+          this.state = "data";
+          break;
+        case "sb": // COM-PORT-OPTION replies (baud rate …), up to IAC SE
+          if (b === IAC) this.state = "sbIac";
+          break;
+        case "sbIac":
+          this.state = b === SE ? "data" : "sb";
+          break;
+      }
+    }
+    return Buffer.from(out);
+  }
+}
+
+/** Byte layer under the stream frames: none for UART / TCP, telnet for RFC 2217. */
+interface Codec {
+  start(): Buffer | null;
+  rx(chunk: Buffer): Buffer;
+  tx(bytes: Buffer): Buffer;
+}
+
+const rawCodec = (): Codec => ({ start: () => null, rx: (c) => c, tx: (b) => b });
+
+const telnetCodec = (): Codec => {
+  const filter = new TelnetFilter();
+  return { start: () => TELNET_BINARY, rx: (c) => filter.push(c), tx: telnetEscape };
+};
+
 /** Stream frames over whichever Duplex is currently attached (serial port, socket). */
 class StreamTransport implements LinkTransport {
   private stream: Duplex | null = null;
   private decoder = new StreamDecoder();
+  private codec = rawCodec();
   private handler: (frame: Frame) => void = () => {};
 
   constructor(
     readonly label: string,
     private log: Log,
+    private makeCodec: () => Codec = rawCodec,
   ) {}
 
   attach(stream: Duplex) {
     this.stream = stream;
     this.decoder = new StreamDecoder(); // drop half a frame from the previous connection
-    stream.write(Buffer.from([0])); // flush garbage on the peer's side (§3.2)
+    this.codec = this.makeCodec();
+    const start = this.codec.start();
+    if (start) stream.write(start);
+    stream.write(this.codec.tx(Buffer.from([0]))); // flush garbage on the peer's side (§3.2)
     stream.on("data", (chunk: Buffer) => {
       const before = this.decoder.stats.errors;
-      for (const f of this.decoder.push(chunk)) this.handler(f);
+      for (const f of this.decoder.push(this.codec.rx(chunk))) this.handler(f);
       if (this.decoder.stats.errors > before) this.log(`[link] dropped frame: ${this.decoder.lastError}`);
     });
   }
@@ -53,7 +134,7 @@ class StreamTransport implements LinkTransport {
 
   send(type: Type, seq: number, payload: Buffer) {
     if (!this.stream) return; // no peer: the frame is lost, like on an unplugged UART
-    this.stream.write(encodeStream(type, seq, payload));
+    this.stream.write(this.codec.tx(encodeStream(type, seq, payload)));
   }
 
   onFrame(cb: (frame: Frame) => void) {
@@ -131,8 +212,8 @@ function listenTcp(host: string, port: number, log: Log): LinkTransport {
   return t;
 }
 
-function connectTcp(host: string, port: number, log: Log): LinkTransport {
-  const t = new StreamTransport(`tcp ${host}:${port}`, log);
+function connectTcp(host: string, port: number, log: Log, telnet = false): LinkTransport {
+  const t = new StreamTransport(`${telnet ? "rfc2217" : "tcp"} ${host}:${port}`, log, telnet ? telnetCodec : rawCodec);
   let closing = false;
   let socket: net.Socket | null = null;
   let warned = false;
@@ -214,16 +295,19 @@ export async function openLink(
       const port = Number(parts.pop());
       return listenTcp(parts[0] || "127.0.0.1", port, opts.log);
     }
-    case "tcp": {
+    case "tcp":
+    case "rfc2217": {
       const i = arg.lastIndexOf(":");
       if (i <= 0) break;
-      return connectTcp(arg.slice(0, i), Number(arg.slice(i + 1)), opts.log);
+      return connectTcp(arg.slice(0, i), Number(arg.slice(i + 1)), opts.log, kind === "rfc2217");
     }
     case "tunnel":
       if (!arg) break;
       return tunnel(arg, opts.role, opts.nodeId, opts.log);
   }
-  throw new Error(`bad --link "${spec}" (serial:COM5[@115200] | tcp-listen:[host:]port | tcp:host:port | tunnel:mqtt-url)`);
+  throw new Error(
+    `bad --link "${spec}" (serial:COM5[@115200] | tcp-listen:[host:]port | tcp:host:port | rfc2217:host:port | tunnel:mqtt-url)`,
+  );
 }
 
 /**
