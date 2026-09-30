@@ -18,9 +18,6 @@
 
 namespace lnk {
 
-// Hands one frame to the transport. The payload is only valid during the call.
-using FrameSink = void (*)(Type type, uint8_t seq, const uint8_t* payload, size_t len);
-
 // What onFrame() leaves for the caller to act on.
 enum class NodeRx : uint8_t {
     None,     // handled here (LINK_STATE, HELLO_REQUEST)

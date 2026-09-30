@@ -123,6 +123,8 @@ export class GatewayBridge {
       this.drop(`${typeName(f.type)}: wrong direction`);
       return;
     }
+    // A HELLO starts a new seq run (the node may have rebooted), so no false gap.
+    if (f.type === Type.Hello) this.node.resetSeq();
     if (this.node.onFrame(f.seq, now) === "up") this.opts.log?.("[gw] node up");
 
     if (f.type === Type.Hello) {
@@ -182,7 +184,6 @@ export class GatewayBridge {
     }
     const rebooted = this.registered !== null && this.registered.bootId !== hello.bootId;
     this.registered = hello;
-    this.node.resetSeq();
     this.opts.log?.(`[gw] ← HELLO ${hello.deviceId} boot ${hello.bootId} fw ${hello.fw}${rebooted ? " (node rebooted)" : ""}`);
     // TIME first, so the status / BOOT the node sends on LINK_STATE already has a ts.
     this.sendTime();

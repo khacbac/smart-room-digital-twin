@@ -58,6 +58,14 @@ size_t buildLinkState(const LinkState& s, char* out, size_t size) {
     return finish(doc, out, size);
 }
 
+size_t buildOffline(const char* deviceId, char* out, size_t size) {
+    JsonDocument doc;
+    doc["v"] = 1;
+    doc["deviceId"] = deviceId;
+    doc["online"] = false;
+    return finish(doc, out, size);
+}
+
 bool parseLinkState(const uint8_t* payload, size_t len, LinkState& out) {
     JsonDocument doc;
     if (deserializeJson(doc, payload, len)) return false;

@@ -173,7 +173,9 @@ gateway boot ──HELLO_REQUEST──▶ node  node trả HELLO → STATUS, KH�
 ```
 
 Gateway gửi LINK_STATE khi trạng thái MQTT đổi, ngay sau HELLO, và **mỗi khi đã 5 s không gửi frame nào**
-(heartbeat của gateway). Gateway gửi lại TIME mỗi 10 phút ❓.
+(heartbeat của gateway). Gateway gửi lại TIME mỗi 10 phút (`LINK_TIME_RESYNC_MS`) ❓. Khi NTP chưa sync, gateway
+**không** gửi TIME (LINK_STATE vẫn gửi bình thường), và gửi ngay ở `tick()` đầu tiên sau khi NTP sync. Trong lúc đó
+payload của node không có `ts`, giống bản 1 mạch khi chưa có NTP.
 
 Sau khi gateway khởi động lại, node có thể gửi thêm 1–2 telemetry trước khi nhận ra, vì LINK_STATE cũ vẫn mang
 đúng `bootId` của nó. Gateway bỏ các frame đó rồi gửi HELLO_REQUEST. Telemetry mất một frame là chấp nhận được.
@@ -298,8 +300,10 @@ device/
     link_peer.h/.cpp      TxTracker (seq, heartbeat), PeerMonitor (presence) ✅ có test
     link_messages.h/.cpp  HELLO / TIME / LINK_STATE (ArduinoJson)          ✅ có test
     link_node.h/.cpp      NodeLink: đăng ký, mqttUp, status còn nợ (§4.3)  ✅ có test
+    link_gateway.h/.cpp   GatewayLink: HELLO → TIME + LINK_STATE, route lên MQTT, offline, command ✅ có test
   test/test_link/         22 test, gồm các vector mẫu ở §3.4
   test/test_link_node/    10 test, cùng kịch bản với tools/link-sim/test/bridge.test.ts
+  test/test_link_gateway/ 18 test: 13 cho GatewayLink, 5 nối NodeLink ⇄ GatewayLink qua stream codec
   src/net.h               uplink mà main.cpp thấy: publish(Channel), popCommand, online …
   src/net_task.cpp        env:esp32-s3 (1 mạch): Wi-Fi + MQTT như trước
   src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi

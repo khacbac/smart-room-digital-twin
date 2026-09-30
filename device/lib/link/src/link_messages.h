@@ -45,4 +45,8 @@ struct LinkState {
 size_t buildLinkState(const LinkState& s, char* out, size_t size);
 bool parseLinkState(const uint8_t* payload, size_t len, LinkState& out);
 
+// The gateway's MQTT Last Will, also published when the node goes quiet (§5.3): the
+// same retained status topic, {"v":1,"deviceId":…,"online":false}.
+size_t buildOffline(const char* deviceId, char* out, size_t size);
+
 }  // namespace lnk

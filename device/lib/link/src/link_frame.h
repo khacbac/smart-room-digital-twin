@@ -35,6 +35,9 @@ bool isKnownType(uint8_t t);
 inline bool fromNode(Type t) { return ((uint8_t)t & 0x80) == 0; }
 const char* typeName(Type t);  // "TELEMETRY" …, "?" when unknown
 
+// Hands one frame to the transport. The payload is only valid during the call.
+using FrameSink = void (*)(Type type, uint8_t seq, const uint8_t* payload, size_t len);
+
 const size_t kHeaderSize = 3;  // version, type, seq
 const size_t kCrcSize = 2;
 const size_t kRawMax = kHeaderSize + LINK_PAYLOAD_MAX + kCrcSize;
