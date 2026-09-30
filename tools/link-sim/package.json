@@ -1,0 +1,24 @@
+{
+  "name": "@srdt/link-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "fake-gateway": "tsx scripts/fake-gateway.ts",
+    "fake-node": "tsx scripts/fake-node.ts"
+  },
+  "dependencies": {
+    "@srdt/contracts": "workspace:*",
+    "mqtt": "^5.16.0",
+    "serialport": "^13.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}

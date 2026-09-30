@@ -23,14 +23,15 @@ Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
 
 | Thư mục | Nội dung | Trạng thái |
 |---|---|---|
-| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt` |
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command. `lib/link`: codec link gateway ⇄ node (chưa nối vào firmware) | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt`; 🟡 `lib/link` nháp |
 | `broker/` | Config Mosquitto local | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
 | `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
 | `server/src/storage/` | Interface storage + driver `memory` (chạy được) + `firestore` (stub) | 🟡 Firestore chờ team cloud |
+| `tools/link-sim/` | Fake gateway / fake node cho phương án 2 mạch: link frame qua serial / TCP / MQTT tunnel, bridge sang broker ([docs](docs/link-protocol.md#62-usb-serial-tới-pc-mỗi-người-dev-một-mình)) | 🟡 nháp, 17 test |
 | `dashboard/` | Next.js 16 static export: value cards, **room twin (SVG)**, chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` là placeholder |
 | `cloud/` | Mock config Firebase Hosting / Firestore rules + indexes, Dockerfile cho Cloud Run | 🟡 mock, chưa deploy |
-| `docs/` | Kiến trúc, hướng dẫn cloud, spec gốc | |
+| `docs/` | Kiến trúc, hướng dẫn cloud, spec gốc, [link gateway ⇄ node](docs/link-protocol.md) (nháp) | |
 
 ## Yêu cầu
 
@@ -65,7 +66,7 @@ curl -s -X POST 127.0.0.1:4000/api/devices/room-01/commands -H 'content-type: ap
 mosquitto_sub -h 127.0.0.1 -t 'srdt/#' -v                      # xem toàn bộ MQTT
 ```
 
-Test: `pnpm test` (contracts + server), `pnpm typecheck`, `cd device && pio test -e native` (firmware).
+Test: `pnpm test` (contracts + server + link-sim), `pnpm typecheck`, `cd device && pio test -e native` (firmware).
 
 ## API backend
 
