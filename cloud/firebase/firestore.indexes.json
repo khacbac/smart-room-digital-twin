@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "commands",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "deviceCode", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commands",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

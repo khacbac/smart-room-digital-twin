@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// MOCK — to be finalised by the cloud team (docs/cloud.md).
+// Idea: the dashboard only reads; every write comes from the backend (Admin SDK bypasses
+// these rules). Commands are NEVER written by the browser: they go through the backend
+// API, which is the only MQTT publisher.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /devices/{code} {
+      allow read: if request.auth != null;
+      allow write: if false;
+
+      match /telemetry/{id} { allow read: if request.auth != null; allow write: if false; }
+      match /events/{id}    { allow read: if request.auth != null; allow write: if false; }
+    }
+    match /commands/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

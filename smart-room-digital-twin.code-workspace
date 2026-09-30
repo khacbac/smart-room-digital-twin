@@ -1,0 +1,16 @@
+{
+  "folders": [
+    { "name": "smart-room-digital-twin", "path": "." },
+    { "name": "device", "path": "device" }
+  ],
+  "settings": {
+    "files.exclude": { "device": true }
+  },
+  "extensions": {
+    "recommendations": [
+      "platformio.platformio-ide",
+      "ms-vscode.cpptools",
+      "wokwi.wokwi-vscode"
+    ]
+  }
+}

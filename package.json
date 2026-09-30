@@ -1,0 +1,15 @@
+{
+  "name": "smart-room-digital-twin",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "dev:server": "pnpm --filter @srdt/server dev",
+    "dev:dashboard": "pnpm --filter @srdt/dashboard dev",
+    "build:dashboard": "pnpm --filter @srdt/dashboard build"
+  }
+}

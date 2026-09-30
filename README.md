@@ -1,0 +1,97 @@
+# Smart Room Digital Twin
+
+Base cho dự án digital twin của smart room: **thiết bị (ESP32/Wokwi) ⇄ MQTT ⇄ backend ⇄ dashboard**.
+Luồng gửi/nhận tín hiệu và điều khiển từ dashboard đã chạy end-to-end. Phần **database/cloud
+(Google Cloud, Firestore, Firebase Hosting) chưa làm**: hiện backend lưu tạm trong RAM, và đã chừa sẵn
+chỗ + mock cho team cloud (xem [`docs/cloud.md`](docs/cloud.md)).
+
+Dựng từ project `../smart-room` (firmware, contracts, luồng MQTT/command giữ nguyên, đã test ở đó);
+bỏ Supabase, AI, CSV. Số `§` trong code trỏ tới spec gốc: [`docs/reference/aiot-smart-room-spec.md`](docs/reference/aiot-smart-room-spec.md).
+
+```
+ ESP32 (Wokwi)              Mosquitto            backend (Node/Fastify)             dashboard (Next.js)
+ hoặc fake-device            :1883                :4000                              :3100
+ ───────────────  telemetry/status/event/ack  ──────────────────────  REST snapshot + SSE live  ──────────
+                 ─────────────▶ broker ─────────▶  twin state         ─────────────────────────▶
+                 ◀──────────── command (QoS 1) ◀─  command service    ◀──── POST /commands ──────
+                                                   storage: memory  (sau này: Firestore / GCP)
+```
+
+Chi tiết luồng: [`docs/architecture.md`](docs/architecture.md).
+
+## Cấu trúc
+
+| Thư mục | Nội dung | Trạng thái |
+|---|---|---|
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi): cảm biến, edge rules, MQTT, command | ✅ copy từ smart-room, prefix MQTT đổi sang `srdt` |
+| `broker/` | Config Mosquitto local | ✅ |
+| `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT (§5) + record/stream types backend ⇄ dashboard (`twin.ts`) | ✅ 27 test |
+| `server/` | Backend: MQTT ingest, presence, command round trip (ack/timeout), REST + SSE, `scripts/fake-device.ts` | ✅ 8 test |
+| `server/src/storage/` | Interface storage + driver `memory` (chạy được) + `firestore` (stub) | 🟡 Firestore chờ team cloud |
+| `dashboard/` | Next.js 16 static export: value cards, **room twin (SVG)**, chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` là placeholder |
+| `cloud/` | Mock config Firebase Hosting / Firestore rules + indexes, Dockerfile cho Cloud Run | 🟡 mock, chưa deploy |
+| `docs/` | Kiến trúc, hướng dẫn cloud, spec gốc | |
+
+## Yêu cầu
+
+Node 24 + pnpm 10, Mosquitto 2.x. Firmware: VS Code + PlatformIO + Wokwi (giống `../smart-room/README.md`).
+
+## Chạy local
+
+```sh
+pnpm install
+cp server/.env.example server/.env              # mặc định STORAGE_DRIVER=memory
+cp dashboard/.env.example dashboard/.env.local
+
+cd broker && mosquitto -c mosquitto.conf -v     # terminal 1
+pnpm dev:server                                 # terminal 2 → http://127.0.0.1:4000
+pnpm dev:dashboard                              # terminal 3 → http://localhost:3100
+```
+
+Thiết bị, chọn một trong hai:
+
+- **Không cần Wokwi:** `pnpm --filter @srdt/server fake-device` (terminal 4). Gõ `hot` / `smoke` / `calm` + Enter
+  để đẩy giá trị lên WARNING/DANGER hoặc về NORMAL.
+- **Wokwi:** `cd device && pio run -e esp32-s3`, rồi trong VS Code mở `device/` → `F1 → Wokwi: Start Simulator`.
+
+Kiểm tra nhanh bằng curl:
+
+```sh
+curl -s 127.0.0.1:4000/health
+curl -s 127.0.0.1:4000/api/devices/room-01                     # snapshot
+curl -sN 127.0.0.1:4000/api/devices/room-01/stream             # SSE live
+curl -s -X POST 127.0.0.1:4000/api/devices/room-01/commands -H 'content-type: application/json' \
+  -d '{"action":"OPEN_WINDOW","value":45,"source":"dashboard"}'  # 202 { commandId, status: "sent" }
+mosquitto_sub -h 127.0.0.1 -t 'srdt/#' -v                      # xem toàn bộ MQTT
+```
+
+Test: `pnpm test` (contracts + server), `pnpm typecheck`, `cd device && pio test -e native` (firmware).
+
+## API backend
+
+| Method | Path | |
+|---|---|---|
+| GET | `/health` | trạng thái MQTT, storage driver, số client SSE |
+| GET | `/api/devices` | danh sách `DeviceRecord` |
+| GET | `/api/devices/:code` | `TwinSnapshot` (device + telemetry 15 phút + 20 event + 20 command) |
+| GET | `/api/devices/:code/stream` | SSE: `snapshot` trước, sau đó `device` / `telemetry` / `event` / `command` |
+| POST | `/api/devices/:code/commands` | `{ action, value?, source? }` → `202` / `409 DEVICE_OFFLINE` / `429` / `503 BROKER_DISCONNECTED` |
+| GET | `/api/devices/:code/commands?limit=` | lịch sử command |
+
+Action: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`, `PING`.
+Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_OVERRIDE`) thì edge rules điều khiển lại.
+
+## Đã kiểm tra (2026-09-30)
+
+- [x] `pnpm test`: 35/35 (27 contracts + 8 server), `pnpm typecheck` sạch, `next build` (static export) OK
+- [x] Mosquitto + backend + fake device: device online, telemetry qua SSE mỗi 2 s, `OPEN_WINDOW 45` → `sent` → `executed` (~3 ms)
+- [x] Dashboard (Chrome headless, desktop + mobile 390 px, light/dark): twin hiện góc cửa 45°, buzzer on, nhãn "manual", đếm ngược override
+- [ ] Chưa chạy lại với Wokwi trong repo này (firmware giống hệt smart-room, chỉ đổi prefix `srdt` và dòng LCD khởi động)
+- [ ] Firestore / Firebase Hosting / Cloud Run: chưa làm, xem `docs/cloud.md`
+
+## Việc tiếp theo gợi ý
+
+1. Team cloud: implement `server/src/storage/firestore/` + (tuỳ chọn) `dashboard/src/lib/datasource/firestore.ts`.
+2. Auth cho dashboard/API (Firebase Auth) trước khi public backend.
+3. Broker có TLS + user/password khi rời máy local (HiveMQ Cloud / EMQX / Mosquitto trên VM).
+4. Twin 3D (three.js) thay `RoomTwin.tsx`, dữ liệu vào giữ nguyên `TwinView`.

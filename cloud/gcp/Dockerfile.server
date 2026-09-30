@@ -1,0 +1,17 @@
+# MOCK — container for the backend on Cloud Run / Compute Engine (docs/cloud.md). Not tested yet.
+# Build from the repo root:  docker build -f cloud/gcp/Dockerfile.server -t srdt-server .
+FROM node:24-slim AS build
+WORKDIR /repo
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
+COPY packages ./packages
+COPY server ./server
+RUN pnpm install --frozen-lockfile --filter @srdt/server... \
+ && pnpm --filter @srdt/server build \
+ && pnpm --filter @srdt/server deploy --legacy --prod /app
+
+FROM node:24-slim
+WORKDIR /app
+COPY --from=build /app ./
+ENV HOST=0.0.0.0 PORT=8080 NODE_ENV=production
+CMD ["node", "dist/index.js"]

@@ -1,0 +1,23 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# platformio
+device/.pio/
+.pio/
+device/.vscode/
+
+# broker
+broker/mosquitto-data/
+
+# firebase
+.firebase/
+cloud/firebase/.firebaserc
