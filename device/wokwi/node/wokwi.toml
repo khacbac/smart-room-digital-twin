@@ -1,12 +1,12 @@
 # Node board (env:node) in Wokwi, with fake-gateway as the gateway (docs/link-protocol.md §6.2).
 # Wokwi exposes one serial port: here it is wired to the link UART (GPIO4/5), not to the
-# console, and served as RFC 2217 on TCP 4000:
+# console, and served as RFC 2217 on TCP 4002 (4000 is the backend):
 #   pio run -e node-wokwi   (env:node + its console on the link, printed by link-sim)
 #   (VS Code) "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, then "Wokwi: Start Simulator"
-#   pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
+#   pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4002
 # Or with the real gateway in a second VS Code window (device/wokwi/gateway): pnpm --filter @srdt/link-sim splice
 [wokwi]
 version = 1
 firmware = '../../.pio/build/node-wokwi/firmware.bin'
 elf = '../../.pio/build/node-wokwi/firmware.elf'
-rfc2217ServerPort = 4000
+rfc2217ServerPort = 4002

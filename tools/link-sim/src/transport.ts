@@ -9,7 +9,7 @@ import { type Frame, StreamDecoder, type Type, decodeRaw, encodeRaw, encodeStrea
 //   serial:COM5[@115200]     UART through a USB-UART adapter (§6.1, §6.2)
 //   tcp-listen:[host:]7000   stream frames over TCP, waits for the peer
 //   tcp:host:7000            stream frames over TCP, connects (and reconnects) to the peer
-//   rfc2217:host:4000        like tcp:, through a telnet/RFC 2217 serial server (Wokwi, §6.2)
+//   rfc2217:host:4002        like tcp:, through a telnet/RFC 2217 serial server (Wokwi, §6.2)
 //   tunnel:mqtts://u:p@host  raw frames over MQTT topics srdt-link/{nodeId}/up|down (§6.3)
 
 export interface FrameSink {

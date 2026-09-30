@@ -6,7 +6,7 @@ import { openLink } from "../src/transport";
 // side: env:node-wokwi and env:gateway-wokwi in two Wokwi simulators, each serving its link
 // UART on its own RFC 2217 port. Both consoles show up here as node| … and gw| ….
 //
-//   pnpm --filter @srdt/link-sim splice                                  rfc2217:4000 (node) ⇄ rfc2217:4001 (gateway)
+//   pnpm --filter @srdt/link-sim splice                                  rfc2217:4002 (node) ⇄ rfc2217:4001 (gateway)
 //   pnpm --filter @srdt/link-sim splice --node serial:COM5              the node board on a USB-UART, gateway in Wokwi
 //
 // Any --link spec works on either side (serial:, tcp:, tcp-listen:, rfc2217:, tunnel:).
@@ -14,7 +14,7 @@ import { openLink } from "../src/transport";
 
 const { values: args } = parseArgs({
   options: {
-    node: { type: "string", default: "rfc2217:127.0.0.1:4000" },
+    node: { type: "string", default: "rfc2217:127.0.0.1:4002" },
     gateway: { type: "string", default: "rfc2217:127.0.0.1:4001" },
     id: { type: "string", default: process.env.DEVICE_ID ?? "room-01" },
     verbose: { type: "boolean", short: "v", default: false },

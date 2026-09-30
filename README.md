@@ -57,13 +57,13 @@ Thiết bị, chọn một trong hai:
 - **Mạch node (2 mạch):** `cd device && pio run -e node -t upload`, nối adapter USB-UART vào GPIO4 (RX) / GPIO5 (TX) + GND,
   rồi `pnpm --filter @srdt/link-sim fake-gateway --link serial:COMx` ([docs/link-protocol.md](docs/link-protocol.md) §6.2).
 - **Mạch node trong Wokwi:** `cd device && pio run -e node-wokwi`, `F1 → Wokwi: Select Config File` → `device/wokwi/node/wokwi.toml`
-  → `Wokwi: Start Simulator`, rồi `pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000`
+  → `Wokwi: Start Simulator`, rồi `pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4002`
   (serial monitor dành cho link; bản `*-wokwi` chép console sang link, fake-gateway in thành `node| …`).
 - **Mạch gateway (2 mạch):** `pio run -e gateway -t upload`, cùng chân GPIO4/5, rồi
   `pnpm --filter @srdt/link-sim fake-node --link serial:COMx`. Trong Wokwi: `pio run -e gateway-wokwi`, config
   `device/wokwi/gateway/wokwi.toml` và `fake-node --link rfc2217:127.0.0.1:4001` (console gateway hiện thành `gw| …`).
 - **Cả 2 mạch trong Wokwi, nối với nhau:** build `node-wokwi` + `gateway-wokwi`, chạy node trong một VS Code window và
-  gateway trong window thứ hai (mở thư mục `device/`), rồi `pnpm --filter @srdt/link-sim splice` (4000 ⇄ 4001, in cả
+  gateway trong window thứ hai (`code -n device/wokwi/gateway`), rồi `pnpm --filter @srdt/link-sim splice` (4002 ⇄ 4001, in cả
   `node| …` và `gw| …`; stdin `cut 20` để rút dây).
 
 Kiểm tra nhanh bằng curl:
@@ -99,6 +99,7 @@ Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_
 - [x] Mosquitto + backend + fake device: device online, telemetry qua SSE mỗi 2 s, `OPEN_WINDOW 45` → `sent` → `executed` (~3 ms)
 - [x] Dashboard (Chrome headless, desktop + mobile 390 px, light/dark): twin hiện góc cửa 45°, buzzer on, nhãn "manual", đếm ngược override
 - [x] `env:gateway-wokwi` trong Wokwi + `fake-node` (rfc2217): HELLO, Wi-Fi, MQTT, NTP → TIME; `die 20` → node lost → offline status → node up; tắt Mosquitto → mqtt down, backoff 1–16 s, reconnect đúng 1 lần `mqtt up`; command từ dashboard → `forwarded` → node `executed`
+- [x] 2 mạch thật trong Wokwi (`node-wokwi` :4002 ⇄ `splice` ⇄ `gateway-wokwi` :4001): dashboard online, telemetry từ cảm biến ảo của node, mở/đóng cửa từ dashboard → servo quay
 - [ ] Chưa chạy lại với Wokwi trong repo này (firmware giống hệt smart-room, chỉ đổi prefix `srdt` và dòng LCD khởi động)
 - [ ] Firestore / Firebase Hosting / Cloud Run: chưa làm, xem `docs/cloud.md`
 

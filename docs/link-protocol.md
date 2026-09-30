@@ -236,7 +236,7 @@ Các script nằm trong [`tools/link-sim/`](../tools/link-sim). Logic của chú
 |---|---|---|
 | `fake-gateway` | người làm **node** | Nói link trên `--link`, bridge sang broker thật (backend + dashboard chạy như thường). `--mqtt none` thì chỉ in ra những gì sẽ publish. stdin: `open [1-90]`, `close`, `buzz on\|off`, `clear`, `ping` (gửi COMMAND thẳng xuống node, ack không publish), `mqtt down\|up` (giả mất broker), `stats` |
 | `fake-node` | người làm **gateway** | HELLO, telemetry/status/event từ phòng giả lập (cùng mô hình với `server/scripts/fake-device.ts`), thực thi và ack command. stdin: `hot`, `smoke`, `calm`, `die [sec]` (im lặng để test presence), `reboot`, `stats` |
-| `splice` | cả hai | Không giả mạch nào: nối **2 mạch thật** (`--node`, `--gateway`, mặc định 2 cổng Wokwi 4000/4001), chuyển nguyên frame giữa hai bên, in console `node\| …` / `gw\| …`. stdin: `cut [sec]` (rút dây, cả 2 bên phải báo mất nhau sau 15 s), `stats` |
+| `splice` | cả hai | Không giả mạch nào: nối **2 mạch thật** (`--node`, `--gateway`, mặc định 2 cổng Wokwi 4002/4001), chuyển nguyên frame giữa hai bên, in console `node\| …` / `gw\| …`. stdin: `cut [sec]` (rút dây, cả 2 bên phải báo mất nhau sau 15 s), `stats` |
 
 ```sh
 # Không cần phần cứng: cả chuỗi trên PC (broker + backend đang chạy như README)
@@ -255,13 +255,13 @@ Tham số khác: `--node room-01`, `--mqtt`, `--prefix`, `-v` (in cả telemetry
 `MQTT_URL`, `MQTT_TOPIC_PREFIX` như `server/.env`.
 
 **Node trong Wokwi, không cần mạch** ([`device/wokwi/node/`](../device/wokwi/node)): cùng linh kiện với
-`device/diagram.json`, nhưng `$serialMonitor` nối vào **UART link (GPIO4/5)** thay cho UART0, và `rfc2217ServerPort = 4000`
+`device/diagram.json`, nhưng `$serialMonitor` nối vào **UART link (GPIO4/5)** thay cho UART0, và `rfc2217ServerPort = 4002` (4000 là cổng backend)
 đưa cổng đó ra TCP. fake-gateway đóng vai gateway:
 
 ```sh
 cd device && pio run -e node-wokwi
 # VS Code: F1 → "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, rồi "Wokwi: Start Simulator"
-pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4000
+pnpm --filter @srdt/link-sim fake-gateway --link rfc2217:127.0.0.1:4002
 ```
 
 - RFC 2217 là telnet: byte 0xFF đi thành `IAC IAC`, và server gửi thêm lệnh negotiation. Frame COBS có thể chứa 0xFF
@@ -297,8 +297,8 @@ VS Code window chỉ chạy một simulator, nên cần 2 window, và cả hai p
 ```sh
 cd device && pio run -e node-wokwi && pio run -e gateway-wokwi
 # Window 1 (thư mục repo): "Wokwi: Select Config File" → device/wokwi/node/wokwi.toml, "Wokwi: Start Simulator"
-# Window 2 (File → New Window, mở thư mục device/): chọn wokwi/gateway/wokwi.toml, "Wokwi: Start Simulator"
-pnpm --filter @srdt/link-sim splice     # rfc2217:127.0.0.1:4000 (node) ⇄ rfc2217:127.0.0.1:4001 (gateway)
+# Window 2: code -n device/wokwi/gateway (thư mục khác window 1; wokwi.toml ở gốc nên chỉ cần "Wokwi: Start Simulator")
+pnpm --filter @srdt/link-sim splice     # rfc2217:127.0.0.1:4002 (node) ⇄ rfc2217:127.0.0.1:4001 (gateway)
 ```
 
 - splice decode rồi encode lại từng frame: frame hợp lệ tới bên kia y nguyên byte, nhiễu và frame hỏng dừng ở đây.
@@ -343,7 +343,7 @@ device/
   src/net_link.cpp        env:node: NodeLink + UART1, TIME → settimeofday, COMMAND → hàng đợi
   src/gateway/main.cpp    env:gateway: UART1 ⇄ GatewayLink ⇄ net_task, console `stats`; không cảm biến, không main.cpp
   src/console_tee.cpp     chỉ env *-wokwi: chép console (UART0) sang UART link để link-sim in ra (§6.2)
-  wokwi/node/             wokwi.toml + diagram.json cho env:node-wokwi, UART link ra RFC 2217 :4000 (§6.2)
+  wokwi/node/             wokwi.toml + diagram.json cho env:node-wokwi, UART link ra RFC 2217 :4002 (§6.2)
   wokwi/gateway/          như trên cho env:gateway-wokwi (chỉ có board), RFC 2217 :4001
 tools/link-sim/           @srdt/link-sim
   src/frame.ts, peer.ts, messages.ts   bản sao TS của lib/link (cùng vector mẫu)
