@@ -161,6 +161,9 @@ Chi tiết frame, message, luồng: [`link-protocol.md`](link-protocol.md).
 | LCD 1602 I2C (0x27) | SDA GPIO8, SCL GPIO9 | |
 | Link UART1 (chỉ 2 mạch) | RX GPIO4, TX GPIO5 | nối chéo với gateway + chung GND |
 
+Bộ kit ESP32 thường (DHT11, OLED, relay thay servo, nút thay biến trở): `env:kit` / `env:node-kit`, sơ đồ chân riêng ở
+[`hardware-kit.md`](hardware-kit.md).
+
 ## 5. Các cách chạy khi dev: thay phần nào bằng đồ giả
 
 Mỗi người chỉ cần phần mình làm; phần còn lại có bản giả trong `server/scripts` và `tools/link-sim`:

@@ -7,7 +7,7 @@
 
 struct AnalogReading {
     uint16_t adcLdr;
-    uint16_t adcPot;
+    uint16_t adcAq;    // pot, or MQ-135 on BOARD_KIT; 0 when the kit uses the AQ buttons
     float light;       // lux, 0…100000
     int airQuality;    // AQ index, 0…1000
 };
@@ -29,8 +29,9 @@ AnalogReading readAnalog();
 DhtReading readDht();  // call at most every DHT_INTERVAL_MS
 bool readPresence();
 
-// Debounced; call every loop. Long fires once when held for BUTTON_LONG_PRESS_MS,
-// Short fires on release before that.
+// Mode button, debounced; call every loop. Long fires once when held for
+// BUTTON_LONG_PRESS_MS, Short fires on release before that. On BOARD_KIT this also
+// polls the two air-quality buttons.
 ButtonEvent pollButton(uint32_t nowMs);
 
 }  // namespace sensors

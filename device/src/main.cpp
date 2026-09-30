@@ -56,8 +56,8 @@ static void printState(uint32_t nowMs) {
 }
 
 static void printRaw() {
-    Serial.printf("[raw] ldr adc=%u light=%.1f | pot adc=%u aq=%d | dht %s t=%.1f h=%.1f\n", analog.adcLdr,
-                  analog.light, analog.adcPot, analog.airQuality, dhtReading.valid ? "ok" : dhtReading.status,
+    Serial.printf("[raw] ldr adc=%u light=%.1f | aq adc=%u aq=%d | dht %s t=%.1f h=%.1f\n", analog.adcLdr,
+                  analog.light, analog.adcAq, analog.airQuality, dhtReading.valid ? "ok" : dhtReading.status,
                   dhtReading.temperature, dhtReading.humidity);
 }
 

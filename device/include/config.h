@@ -83,7 +83,55 @@
 #define STATUS_RGB_LEVEL 16       // of 255: the bare LED is blinding at full power
 #define STATUS_RGB_BLINK_MS 500   // half period: 1 Hz while the node is lost
 
-// ---- Pins (§4.4, must match diagram.json) ----------------------------------
+// ---- Pins (§4.4) -----------------------------------------------------------
+// Two hardware variants share every file except sensors.cpp, actuators.cpp and
+// display.cpp:
+//   default    ESP32-S3 DevKitC-1 + DHT22, LDR, pot, servo, LCD 1602 (Wokwi, diagram.json)
+//   BOARD_KIT  classic ESP32 (ESP-32S / esp32dev) + the starter kit: DHT11, LDR module,
+//              IR obstacle module, 3 buttons, 2-channel 5 V relay, OLED 0.96" SSD1306
+//              (env kit, node-kit; wiring in docs/hardware-kit.md)
+
+#if defined(BOARD_KIT)
+
+// ADC1 only (ADC2 is unusable while Wi-Fi is active). GPIO34–39 are input-only and
+// have no internal pull-ups, so the buttons are elsewhere. Avoids the strapping pins
+// 0, 2, 12, 15 (GPIO5 is the link TX, which idles high like the pin wants at boot).
+#define PIN_LDR 32         // light module AO, ADC1_CH4
+#define PIN_DHT 16         // DHT11 module DATA
+#define PIN_PIR 34         // HC-SR501 OUT (push-pull, 3.3 V)
+#define PIN_IR 35          // IR obstacle module DO, LOW = something in front
+#define PIN_BUTTON 13      // mode button (mute / clear), INPUT_PULLUP, active LOW
+#define PIN_AQ_UP 14       // air quality +AQ_STEP (stands in for the pot), INPUT_PULLUP
+#define PIN_AQ_DOWN 33     // air quality -AQ_STEP, INPUT_PULLUP
+#define PIN_MQ135 36       // MQ-135 AO through a 10k/20k divider, ADC1_CH0 (input-only "VP")
+#define PIN_RELAY_WINDOW 18  // relay IN1: energized = window open (angle > 0)
+#define PIN_BUZZER 23      // passive buzzer (LEDC tone)
+#define PIN_LED_GREEN 25   // "OK" LED: the kit has no green, a blue LED sits here
+#define PIN_LED_YELLOW 26
+#define PIN_LED_RED 27
+#define PIN_I2C_SDA 21
+#define PIN_I2C_SCL 22
+
+#define RELAY_ACTIVE_LOW 1  // the common optocoupler relay boards pull in on IN = LOW
+#define AQ_STEP 100         // one button press; 0 → DANGER (900) in 9 presses
+#define AQ_START 200        // simulated air quality at boot (NORMAL)
+
+// Air quality source: 0 = the AQ+/AQ- buttons, 1 = an MQ-135 on PIN_MQ135 (the buttons
+// are then unused). The MQ-135 gives a relative index, not ppm: MQ135_CLEAN_ADC (the
+// `[raw] aq adc=` value in clean air, after warm-up) maps to MQ135_CLEAN_AQ, a full
+// scale ADC to AIR_QUALITY_MAX, linear in between.
+#ifndef KIT_MQ135
+#define KIT_MQ135 0
+#endif
+#define MQ135_CLEAN_ADC 1200
+#define MQ135_CLEAN_AQ 200
+#define MQ135_WARMUP_MS 120000  // the heater reads high at first; AQ holds at CLEAN_AQ till then
+
+#define OLED_I2C_ADDR 0x3C  // 0x3D on some boards (address jumper on the back)
+#define OLED_WIDTH 128
+#define OLED_HEIGHT 64
+
+#else
 
 #define PIN_LDR 1          // ADC1_CH0 (ADC2 is unusable while Wi-Fi is active)
 #define PIN_POT 2          // ADC1_CH1
@@ -97,6 +145,8 @@
 #define PIN_LED_RED 40
 #define PIN_I2C_SDA 8
 #define PIN_I2C_SCL 9
+
+#endif
 
 // ---- Actuators (§4.3, §4.7) ------------------------------------------------
 
@@ -115,7 +165,7 @@
 // ---- Timing (§7.1) ---------------------------------------------------------
 
 #define SAMPLE_INTERVAL_MS 1000     // analog sensors + PIR, then rule evaluation
-#define DHT_INTERVAL_MS 2000        // DHT22 max rate is 0.5 Hz
+#define DHT_INTERVAL_MS 2000        // DHT22 max rate is 0.5 Hz (DHT11: 1 Hz)
 #define TELEMETRY_INTERVAL_MS 2000  // MQTT telemetry + serial [edge] line (§5.3)
 #define STATUS_INTERVAL_MS 30000    // retained status heartbeat (§5.4)
 #define LCD_INTERVAL_MS 500

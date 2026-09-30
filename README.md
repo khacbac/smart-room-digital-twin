@@ -226,6 +226,9 @@ báo offline, nối lại → online), `stats`.
 [`docs/architecture.md` §4](docs/architecture.md#phần-cứng-mạch-node-giống-mạch-1-board-devicediagramjson). Firmware
 `env:esp32-s3` đang để Wi-Fi/broker của Wokwi; đổi bằng `-D WIFI_SSID=…` trong `platformio.ini` nếu cần.
 
+**Bộ kit ESP32 thường** (ESP-32S, DHT11, OLED, relay, nút thay biến trở): `env:kit` (1 mạch) hoặc `env:node-kit`
+(mạch node). Sơ đồ chân và cách lắp ở [`docs/hardware-kit.md`](docs/hardware-kit.md).
+
 **2 mạch thật (M3, chưa chạy thử):** làm theo checklist 7 bước ở
 [`docs/link-protocol.md` §6.1](docs/link-protocol.md#61-uart-chạy-thật-2-mạch-chung-hộp). Tóm tắt:
 
@@ -272,7 +275,7 @@ pnpm test                          # contracts (27) + server (8) + link-sim (23)
 pnpm typecheck
 pnpm build:dashboard               # static export ra dashboard/out
 cd device && pio test -e native    # firmware C++ trên PC: edge rules, protocol, link (100), cần gcc (§1.4)
-cd device && pio run -e esp32-s3 && pio run -e node && pio run -e gateway   # build đủ firmware
+cd device && pio run -e esp32-s3 -e node -e gateway -e kit -e node-kit   # build đủ firmware
 ```
 
 ## 7. Sự cố thường gặp

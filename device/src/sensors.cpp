@@ -22,9 +22,79 @@ static float ldrToLux(uint16_t adc) {
     return constrain(lux, 0.0f, LIGHT_MAX_LUX);
 }
 
+// Debounced INPUT_PULLUP button. Long fires once when held for BUTTON_LONG_PRESS_MS,
+// Short fires on release before that.
+struct Button {
+    uint8_t pin;
+    bool rawDown = false;
+    bool stableDown = false;
+    uint32_t rawChangedAt = 0;
+    uint32_t pressedAt = 0;
+    bool longFired = false;
+
+    explicit Button(uint8_t p) : pin(p) {}
+
+    ButtonEvent poll(uint32_t nowMs) {
+        const bool down = digitalRead(pin) == LOW;
+        if (down != rawDown) {
+            rawDown = down;
+            rawChangedAt = nowMs;
+        }
+
+        if (rawDown != stableDown && nowMs - rawChangedAt >= BUTTON_DEBOUNCE_MS) {
+            stableDown = rawDown;
+            if (stableDown) {
+                pressedAt = nowMs;
+                longFired = false;
+            } else if (!longFired) {
+                return ButtonEvent::Short;
+            }
+        }
+
+        if (stableDown && !longFired && nowMs - pressedAt >= BUTTON_LONG_PRESS_MS) {
+            longFired = true;
+            return ButtonEvent::Long;
+        }
+        return ButtonEvent::None;
+    }
+};
+
+static Button modeButton(PIN_BUTTON);
+
+#if defined(BOARD_KIT) && KIT_MQ135
+
+// §4.6 for a real sensor: relative index, clean air → MQ135_CLEAN_AQ.
+static int mq135ToAirQuality(uint16_t adc, uint32_t nowMs) {
+    if (nowMs < MQ135_WARMUP_MS) return MQ135_CLEAN_AQ;
+    const float span = (float)(ADC_MAX - MQ135_CLEAN_ADC);
+    const float aq = MQ135_CLEAN_AQ + (adc - (float)MQ135_CLEAN_ADC) / span * (AIR_QUALITY_MAX - MQ135_CLEAN_AQ);
+    return constrain((int)lroundf(aq), 0, AIR_QUALITY_MAX);
+}
+
+#elif defined(BOARD_KIT)
+
+// No air sensor yet: two buttons step a simulated air quality instead, which keeps
+// UNCOMFORTABLE / WARNING / DANGER reachable by hand (§4.6).
+static Button aqUp(PIN_AQ_UP);
+static Button aqDown(PIN_AQ_DOWN);
+static int airQuality = AQ_START;
+
+static void pollAirQualityButtons(uint32_t nowMs) {
+    int step = 0;
+    if (aqUp.poll(nowMs) == ButtonEvent::Short) step += AQ_STEP;
+    if (aqDown.poll(nowMs) == ButtonEvent::Short) step -= AQ_STEP;
+    if (step == 0) return;
+    airQuality = constrain(airQuality + step, 0, AIR_QUALITY_MAX);
+    Serial.printf("[aq] %d\n", airQuality);
+}
+
+#else
+
 static int potToAirQuality(uint16_t adc) {
     return (int)lroundf(adc / (float)ADC_MAX * AIR_QUALITY_MAX);
 }
+
+#endif
 
 namespace sensors {
 
@@ -32,15 +102,32 @@ void begin() {
     analogReadResolution(12);
     pinMode(PIN_PIR, INPUT);
     pinMode(PIN_BUTTON, INPUT_PULLUP);
+#if defined(BOARD_KIT)
+    pinMode(PIN_IR, INPUT);  // the module has its own pull-up
+#if !KIT_MQ135
+    pinMode(PIN_AQ_UP, INPUT_PULLUP);
+    pinMode(PIN_AQ_DOWN, INPUT_PULLUP);
+#endif
+    dht.setup(PIN_DHT, DHTesp::DHT11);
+#else
     dht.setup(PIN_DHT, DHTesp::DHT22);
+#endif
 }
 
 AnalogReading readAnalog() {
     AnalogReading r;
     r.adcLdr = analogRead(PIN_LDR);
-    r.adcPot = analogRead(PIN_POT);
     r.light = ldrToLux(r.adcLdr);
-    r.airQuality = potToAirQuality(r.adcPot);
+#if defined(BOARD_KIT) && KIT_MQ135
+    r.adcAq = analogRead(PIN_MQ135);
+    r.airQuality = mq135ToAirQuality(r.adcAq, millis());
+#elif defined(BOARD_KIT)
+    r.adcAq = 0;
+    r.airQuality = airQuality;
+#else
+    r.adcAq = analogRead(PIN_POT);
+    r.airQuality = potToAirQuality(r.adcAq);
+#endif
     return r;
 }
 
@@ -55,37 +142,19 @@ DhtReading readDht() {
 }
 
 bool readPresence() {
+#if defined(BOARD_KIT)
+    // PIR misses someone sitting still; the IR module catches a person at the desk.
+    return digitalRead(PIN_PIR) == HIGH || digitalRead(PIN_IR) == LOW;
+#else
     return digitalRead(PIN_PIR) == HIGH;
+#endif
 }
 
 ButtonEvent pollButton(uint32_t nowMs) {
-    static bool rawDown = false;
-    static bool stableDown = false;
-    static uint32_t rawChangedAt = 0;
-    static uint32_t pressedAt = 0;
-    static bool longFired = false;
-
-    const bool down = digitalRead(PIN_BUTTON) == LOW;
-    if (down != rawDown) {
-        rawDown = down;
-        rawChangedAt = nowMs;
-    }
-
-    if (rawDown != stableDown && nowMs - rawChangedAt >= BUTTON_DEBOUNCE_MS) {
-        stableDown = rawDown;
-        if (stableDown) {
-            pressedAt = nowMs;
-            longFired = false;
-        } else if (!longFired) {
-            return ButtonEvent::Short;
-        }
-    }
-
-    if (stableDown && !longFired && nowMs - pressedAt >= BUTTON_LONG_PRESS_MS) {
-        longFired = true;
-        return ButtonEvent::Long;
-    }
-    return ButtonEvent::None;
+#if defined(BOARD_KIT) && !KIT_MQ135
+    pollAirQualityButtons(nowMs);
+#endif
+    return modeButton.poll(nowMs);
 }
 
 }  // namespace sensors
