@@ -53,6 +53,8 @@ function telemetry(code: string, seq: number, measuredAt: string): TelemetryReco
     windowAngle: 0,
     buzzer: false,
     overrideActive: false,
+    mlState: null,
+    aiControl: false,
   };
 }
 
