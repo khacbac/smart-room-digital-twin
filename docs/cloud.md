@@ -112,6 +112,13 @@ Lý do chọn phạm vi này: `server/src/storage/types.ts` đã là seam sạch
       — Console → IAM & Admin → IAM → Grant access. Không có bước này thì key sinh ra
       token hợp lệ nhưng mọi query trả `7 PERMISSION_DENIED` (xem §3.5 bẫy #5)
 
+> **Thêm thành viên về sau** (không phải việc của Bước 0, làm khi có người cần): Project settings →
+> *Users and permissions* → *Add member*, role `Editor`. Mỗi người tự sinh key riêng
+> (*Service accounts → Generate new private key*) thay vì chuyền tay `service-account.json` — key đó
+> bypass toàn bộ rules và không thu hồi riêng lẻ được nếu dùng chung. Role IAM ở trên cấp một lần cho
+> cả project nên không lặp lại. Hướng dẫn đầy đủ cho người mới:
+> [README §3.1](../README.md#31-lưu-dữ-liệu-memory-mặc-định-hay-firestore).
+
 #### Bước 1 — Deps + config
 
 - [x] `pnpm --filter @srdt/server add firebase-admin`

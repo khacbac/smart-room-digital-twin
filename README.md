@@ -28,7 +28,7 @@ Dựng từ project `../smart-room`; số `§` trong code trỏ tới spec gốc
 
 1. [Cài đặt công cụ](#1-cài-đặt-công-cụ)
 2. [Lấy code và cài dependencies](#2-lấy-code-và-cài-dependencies)
-3. [Chạy broker + backend + dashboard](#3-chạy-broker--backend--dashboard)
+3. [Chạy broker + backend + dashboard](#3-chạy-broker--backend--dashboard): [3.1 memory hay Firestore](#31-lưu-dữ-liệu-memory-mặc-định-hay-firestore)
 4. [Chạy thiết bị](#4-chạy-thiết-bị): A. fake-device · B. 1 mạch Wokwi · C–E. 2 mạch Wokwi · F. mạch thật
 5. [Kiểm tra](#5-kiểm-tra)
 6. [Test](#6-test)
@@ -158,6 +158,58 @@ status mỗi lần restart broker**. Chỉ cần tạo một lần (PowerShell: 
 Mở http://localhost:3100: dashboard hiện thiết bị `room-01` ở trạng thái **offline** cho tới khi có thiết bị chạy
 (bước 4). Backend log `mqtt connected`; `curl -s 127.0.0.1:4000/health` trả `"mqtt":"connected"`.
 
+### 3.1 Lưu dữ liệu: `memory` (mặc định) hay Firestore
+
+Mặc định `STORAGE_DRIVER=memory`: mọi thứ nằm trong RAM, **mất hết khi restart backend**, nhưng chạy được
+đầy đủ mọi tính năng và **không cần tài khoản Firebase nào**. Làm dashboard, firmware hay backend thì cứ
+để nguyên — không phải xin quyền gì cả.
+
+Chỉ khi muốn dữ liệu **sống sót qua restart** mới cần Firestore. Lúc đó nhờ chủ project thêm bạn làm member:
+
+1. **Chủ project:** Firebase Console → ⚙️ *Project settings* → *Users and permissions* → *Add member*
+   → email của bạn, role **Editor**.
+2. **Bạn:** cùng trang đó → tab *Service accounts* → **Generate new private key**
+   → lưu vào `cloud/firebase/service-account.json`.
+3. `cp cloud/firebase/.firebaserc.example cloud/firebase/.firebaserc` → điền project id.
+4. Trong `server/.env` (chép từ `server/.env.example` nếu chưa có):
+
+   ```sh
+   STORAGE_DRIVER=firestore
+   GCP_PROJECT_ID=<project-id>
+   GOOGLE_APPLICATION_CREDENTIALS=../cloud/firebase/service-account.json
+   TELEMETRY_PERSIST_INTERVAL_SEC=15   # 5 (mặc định) sẽ đốt hạn mức miễn phí gấp 3 lần
+   ```
+
+5. `pnpm dev:server` (Node >= 24, §1.1), rồi kiểm tra:
+
+   ```sh
+   curl -s 127.0.0.1:4000/health      # -> "storage":{"driver":"firestore","ok":true}
+   ```
+
+Restart backend rồi mở lại dashboard: biểu đồ và nhật ký sự kiện vẫn còn — đó là thứ `memory` không làm được.
+
+**Những chỗ dễ vấp:**
+
+- **Key không tự có quyền.** *Generate new private key* chỉ tạo file, không cấp quyền. Service account
+  `firebase-adminsdk-…` phải có role `Cloud Datastore User` (Console → IAM & Admin → IAM). Thiếu nó thì
+  token hợp lệ nhưng **mọi** query trả `7 PERMISSION_DENIED`. Role này cấp **một lần cho cả project**, nên
+  nếu người trước đã làm thì bạn không phải làm lại.
+- **Cần Node >= 24**, chặt hơn phần còn lại của repo. `@google-cloud/firestore` là optional dependency
+  của `firebase-admin` và pnpm **im lặng bỏ qua** nó trên Node 20 → `Cannot find module
+  '@google-cloud/firestore'` lúc chạy. Sửa: đổi sang Node 24 rồi `pnpm install` **lại**.
+- **`service-account.json` là private key**, đã gitignored. Nó bypass toàn bộ security rules, nên **đừng
+  gửi qua chat** — mỗi người tự sinh key của mình ở bước 2. Xoá được từng key riêng trong
+  Google Cloud Console → IAM → Service Accounts → *Manage keys* (lưu ý: mọi key đều thuộc cùng một service
+  account, nên log không phân biệt được ai gọi).
+- **Hạn mức miễn phí 20 000 writes/ngày, dùng chung cả team.** Một `fake-device` tốn ~270 writes/giờ, nên
+  dùng bình thường thì thoải mái — nhưng **quên tắt qua đêm** là hết ~6 500. Ba cái bỏ quên là hôm sau
+  demo gặp lỗi ghi. Nhớ Ctrl-C trước khi đóng máy.
+
+**Test thì không cần quyền gì.** `pnpm --filter @srdt/server test:firestore` chạy trên **emulator** với
+project id giả `srdt-contract-test` — không đăng nhập, không đụng dữ liệu thật, chỉ cần JDK >= 21.
+
+Chi tiết mô hình dữ liệu, chi phí và các quyết định kỹ thuật: [`docs/cloud.md`](docs/cloud.md).
+
 ## 4. Chạy thiết bị
 
 Chọn **một** trong các cách dưới. Backend và dashboard giữ nguyên ở mọi cách (sơ đồ ở
@@ -280,7 +332,7 @@ Kết quả mong đợi: telemetry mỗi 2 s trên `srdt/room-01/telemetry`, `st
 ## 6. Test
 
 ```sh
-pnpm test                          # contracts (27) + server (8) + link-sim (23)
+pnpm test                          # contracts (27) + server (20) + link-sim (23)
 pnpm typecheck
 pnpm build:dashboard               # static export ra dashboard/out
 cd device && pio test -e native    # firmware C++ trên PC: edge rules, protocol, link (100), cần gcc (§1.4)
