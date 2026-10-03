@@ -68,7 +68,12 @@ pnpm -v                      # 10.13.1
   `C:\Program Files\mosquitto` vào `PATH`. Installer có thể tạo **service Mosquitto** chạy sẵn trên cổng 1883
   với config mặc định: tắt nó đi (`services.msc` → Mosquitto Broker → Stop, Startup type = Manual), vì project
   chạy broker bằng config riêng trong `broker/`.
-- **macOS:** `brew install mosquitto`
+- **macOS:** `brew install mosquitto`. Homebrew đặt **daemon** `mosquitto` ở `sbin`, thường không có sẵn
+  trong `PATH` (chỉ `mosquitto_sub` / `mosquitto_pub` nằm ở `bin`), nên `mosquitto -c ...` báo
+  *command not found*. Thêm vào `~/.zshrc` rồi mở lại terminal:
+  ```sh
+  export PATH="/opt/homebrew/sbin:$PATH"   # Mac Intel: /usr/local/sbin
+  ```
 - **Ubuntu/Debian:** `sudo apt install mosquitto mosquitto-clients`, rồi `sudo systemctl disable --now mosquitto`
   (lý do như trên).
 
@@ -137,7 +142,7 @@ Mở **3 terminal** ở thư mục gốc repo:
 
 ```sh
 # terminal 1: MQTT broker (chỉ nghe 127.0.0.1)
-cd broker && mosquitto -c mosquitto.conf -v
+cd broker && mkdir -p mosquitto-data && mosquitto -c mosquitto.conf -v
 
 # terminal 2: backend → http://127.0.0.1:4000
 pnpm dev:server
@@ -145,6 +150,10 @@ pnpm dev:server
 # terminal 3: dashboard → http://localhost:3100
 pnpm dev:dashboard
 ```
+
+`mosquitto-data/` là thư mục `persistence_location` trong `mosquitto.conf`, được gitignore nên bản clone mới
+chưa có. Thiếu nó broker vẫn chạy nhưng cứ 10 giây lại log `Error saving in-memory database` và **mất retained
+status mỗi lần restart broker**. Chỉ cần tạo một lần (PowerShell: `mkdir mosquitto-data`).
 
 Mở http://localhost:3100: dashboard hiện thiết bị `room-01` ở trạng thái **offline** cho tới khi có thiết bị chạy
 (bước 4). Backend log `mqtt connected`; `curl -s 127.0.0.1:4000/health` trả `"mqtt":"connected"`.
@@ -234,7 +243,7 @@ báo offline, nối lại → online), `stats`.
 
 ```sh
 # broker nghe cả LAN (cho phép qua Windows Firewall ở Private network), lấy IP PC bằng ipconfig
-cd broker && mosquitto -c mosquitto-lan.conf -v
+cd broker && mkdir -p mosquitto-data && mosquitto -c mosquitto-lan.conf -v
 
 # Wi-Fi 2.4 GHz + IP broker cho gateway (file gitignored)
 cp device/secrets.ini.example device/secrets.ini      # rồi sửa SSID, password, MQTT_HOST
@@ -282,6 +291,8 @@ cd device && pio run -e esp32-s3 -e node -e gateway -e kit -e node-kit   # build
 
 | Triệu chứng | Nguyên nhân / cách sửa |
 |---|---|
+| macOS: `mosquitto: command not found` (nhưng `mosquitto_sub` chạy được) | daemon ở `sbin` chưa vào `PATH` (§1.2) |
+| `mosquitto`: *Error saving in-memory database ... No such file or directory* | thiếu `broker/mosquitto-data/`: `mkdir -p mosquitto-data` (§3) |
 | `mosquitto`: *Address already in use* | service Mosquitto cài sẵn đang chiếm 1883: tắt service (§1.2) |
 | Backend không nối được broker trên Windows | dùng `mqtt://127.0.0.1:1883`, không dùng `localhost` (có thể ra `::1`) |
 | `pio: command not found` | dùng PlatformIO terminal hoặc đường dẫn đầy đủ (§1.3) |
