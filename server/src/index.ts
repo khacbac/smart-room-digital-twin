@@ -31,6 +31,7 @@ async function main() {
     {
       autoRegister: config.AUTO_REGISTER_DEVICES,
       offlineAfterMs: config.DEVICE_OFFLINE_AFTER_SEC * 1000,
+      persistIntervalMs: config.DEVICE_PERSIST_INTERVAL_SEC * 1000,
       seed: config.SEED_DEVICES,
     },
     log,

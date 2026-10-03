@@ -21,17 +21,30 @@ const Env = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, "letters, digits, '-' and '_' only")
     .default("srdt"),
 
-  // Storage: `memory` works today, `firestore` is the stub for the cloud team.
+  // Storage: `memory` keeps everything in RAM, `firestore` persists to Cloud Firestore.
   STORAGE_DRIVER: z.enum(["memory", "firestore"]).default("memory"),
   GCP_PROJECT_ID: z.string().optional(),
+  /** Named Firestore database. Unset means the project's `(default)` one. */
+  FIRESTORE_DATABASE_ID: z.string().optional(),
 
   SEED_DEVICES: list.default("room-01"),
   AUTO_REGISTER_DEVICES: bool.default("true"),
   TELEMETRY_PERSIST_INTERVAL_SEC: positive.default(5),
   DEVICE_OFFLINE_AFTER_SEC: positive.default(45),
+  /** How often the device document is written. The dashboard is pushed live regardless. */
+  DEVICE_PERSIST_INTERVAL_SEC: positive.default(60),
   COMMAND_ACK_TIMEOUT_SEC: positive.default(10),
   /** How much history `GET /api/devices/:code` returns for the charts. */
   SNAPSHOT_TELEMETRY_MIN: positive.default(15),
+}).superRefine((env, ctx) => {
+  // Fail at boot rather than on the first write, once MQTT messages are already arriving.
+  if (env.STORAGE_DRIVER === "firestore" && !env.GCP_PROJECT_ID) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["GCP_PROJECT_ID"],
+      message: "required when STORAGE_DRIVER=firestore",
+    });
+  }
 });
 
 export type Config = z.infer<typeof Env>;

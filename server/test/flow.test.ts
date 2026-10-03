@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CommandAck, StreamMessage } from "@srdt/contracts";
 import { pino } from "pino";
 import { CommandService, type CommandPublisher } from "../src/commands/command.service";
@@ -116,6 +116,24 @@ function telemetryMsg(patch: object = {}) {
   };
 }
 
+function statusMsg(patch: object = {}) {
+  return {
+    v: 1,
+    deviceId: "room-01",
+    online: true,
+    bootId: "a1b2c3d4",
+    ts: null,
+    fw: "0.1.0",
+    uptimeSec: 10,
+    rssi: -50,
+    edgeState: "NORMAL",
+    actuators: { windowAngle: 0, buzzer: false },
+    override: { window: false, buzzer: false, expiresInSec: 0 },
+    sensorFault: { dht: false },
+    ...patch,
+  };
+}
+
 function ack(commandId: string, status: CommandAck["status"] = "executed"): CommandAck {
   return {
     v: 1,
@@ -177,6 +195,29 @@ describe("uplink", () => {
 
     await t.receive("status", { v: 1, deviceId: "room-01", online: false }, true);
     expect(t.devices.get("room-01")?.presence).toBe("offline");
+  });
+
+  it("streams every device change but writes the document on a throttle", async () => {
+    const t = await setup();
+    const put = vi.spyOn(t.storage.devices, "put");
+
+    await t.receive("telemetry", telemetryMsg());
+    expect(put).toHaveBeenCalledTimes(1); // DEVICE_ONLINE must survive a restart
+
+    // Two minutes of status: `reported` differs every time (uptimeSec, rssi), which used
+    // to mean one write per message — the dominant Firestore cost (docs/cloud.md §2).
+    for (let i = 0; i < 8; i += 1) {
+      t.clock.advance(15_000);
+      await t.receive("status", statusMsg({ uptimeSec: 10 + i, rssi: -50 - i }));
+    }
+    expect(put.mock.calls.length).toBeLessThanOrEqual(3); // ~1 per DEVICE_PERSIST_INTERVAL_MS
+    expect(t.hub.types().filter((x) => x === "device").length).toBeGreaterThanOrEqual(8);
+
+    // A durable change does not wait for the throttle.
+    const before = put.mock.calls.length;
+    t.clock.advance(1000);
+    await t.receive("status", statusMsg({ edgeState: "WARNING" }));
+    expect(put.mock.calls.length).toBe(before + 1);
   });
 
   it("a retained online status updates the reported state but never counts as presence", async () => {

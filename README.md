@@ -12,7 +12,7 @@ live và gửi lệnh ngược lại.
  ───────────────  telemetry/status/event/ack  ─────────────────  REST snapshot + SSE live  ─────────
                  ─────────────▶ broker ─────────▶  twin state    ─────────────────────────▶
                  ◀──────────── command (QoS 1) ◀─  commands      ◀──── POST /commands ──────
-                                                   storage: memory (sau này Firestore / GCP)
+                                                   storage: memory | firestore
 ```
 
 **Sơ đồ kiến trúc, bản đồ code, luồng tín hiệu: [`docs/architecture.md`](docs/architecture.md)** (đọc cái này trước).
@@ -328,10 +328,10 @@ Bản đồ chi tiết từng file: [`docs/architecture.md` §3](docs/architectu
 | `broker/` | Config Mosquitto: `mosquitto.conf` (local), `mosquitto-lan.conf` (cho mạch thật) | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT + kiểu dữ liệu backend ⇄ dashboard | ✅ |
 | `server/` | Backend: MQTT ingest, presence, command round trip, REST + SSE, `scripts/fake-device.ts` | ✅ |
-| `server/src/storage/` | Interface storage + driver `memory` (chạy được) + `firestore` (stub) | 🟡 Firestore chờ team cloud |
+| `server/src/storage/` | Interface storage + driver `memory` và `firestore` (Cloud Firestore) | ✅ cả hai chạy được |
 | `tools/link-sim/` | fake-gateway / fake-node / splice cho phương án 2 mạch (serial, TCP, RFC 2217, MQTT tunnel) | ✅ |
 | `dashboard/` | Next.js 16 static export: value cards, room twin (SVG), chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` |
-| `cloud/` | Mock Firebase Hosting / Firestore rules + indexes, Dockerfile Cloud Run | 🟡 mock |
+| `cloud/` | Firestore rules + indexes (đã deploy); Firebase Hosting / Dockerfile Cloud Run vẫn là mock | 🟡 một phần |
 | `docs/` | [kiến trúc](docs/architecture.md), [link 2 mạch](docs/link-protocol.md), [cloud](docs/cloud.md), spec gốc | |
 
 ## Đã kiểm tra (2026-09-30)
@@ -347,12 +347,13 @@ Bản đồ chi tiết từng file: [`docs/architecture.md` §3](docs/architectu
       WARNING/DANGER lên dashboard
 - [x] LED trạng thái gateway (WS2812 GPIO48): đỏ → vàng → xanh, nháy khi mất node
 - [ ] 2 mạch thật (M3): chưa chạy, checklist ở [`docs/link-protocol.md` §6.1](docs/link-protocol.md#61-uart-chạy-thật-2-mạch-chung-hộp)
-- [ ] Firestore / Firebase Hosting / Cloud Run: chưa làm, xem [`docs/cloud.md`](docs/cloud.md)
+- [x] Firestore: xong, xem [`docs/cloud.md`](docs/cloud.md) §3
+- [ ] Firebase Hosting / Cloud Run: chưa làm, xem [`docs/cloud.md`](docs/cloud.md) §4
 
 ## Việc tiếp theo gợi ý
 
 1. M3: cắm UART giữa 2 mạch thật theo checklist ở `docs/link-protocol.md` §6.1.
-2. Team cloud: implement `server/src/storage/firestore/` + (tuỳ chọn) `dashboard/src/lib/datasource/firestore.ts`.
+2. Team cloud: deploy backend (Cloud Run) + dashboard (Firebase Hosting), xem `docs/cloud.md` §4.
 3. Auth cho dashboard/API (Firebase Auth) trước khi public backend.
 4. Broker có TLS + user/password khi rời máy local (HiveMQ Cloud / EMQX / Mosquitto trên VM).
 5. Twin 3D (three.js) thay `RoomTwin.tsx`, dữ liệu vào giữ nguyên `TwinView`.

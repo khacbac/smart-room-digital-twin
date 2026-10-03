@@ -8,6 +8,7 @@
     "build": "tsup",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "test:firestore": "firebase emulators:exec --project srdt-contract-test --config ../cloud/firebase/firebase.json --only firestore 'vitest run'",
     "typecheck": "tsc -p tsconfig.json",
     "fake-device": "tsx scripts/fake-device.ts"
   },
@@ -15,6 +16,7 @@
     "@fastify/cors": "^11.3.0",
     "@srdt/contracts": "workspace:*",
     "fastify": "^5.12.5",
+    "firebase-admin": "^14.5.0",
     "mqtt": "^5.16.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",

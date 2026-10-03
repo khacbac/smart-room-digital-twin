@@ -1,21 +1,18 @@
 rules_version = '2';
 
-// MOCK — to be finalised by the cloud team (docs/cloud.md).
-// Idea: the dashboard only reads; every write comes from the backend (Admin SDK bypasses
-// these rules). Commands are NEVER written by the browser: they go through the backend
-// API, which is the only MQTT publisher.
+// Deny-all, on purpose.
+//
+// Every read and write goes through the backend: the dashboard gets its data from
+// `GET /api/devices/:code` and the SSE stream, and commands are published to MQTT by the
+// backend, which is the only publisher. No browser ever talks to Firestore directly, so
+// no client needs access here. The backend uses the Admin SDK, which bypasses these rules.
+//
+// Relax this only when the dashboard starts reading Firestore directly (docs/cloud.md §5),
+// and then only together with Firebase Auth (§6).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /devices/{code} {
-      allow read: if request.auth != null;
-      allow write: if false;
-
-      match /telemetry/{id} { allow read: if request.auth != null; allow write: if false; }
-      match /events/{id}    { allow read: if request.auth != null; allow write: if false; }
-    }
-    match /commands/{id} {
-      allow read: if request.auth != null;
-      allow write: if false;
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

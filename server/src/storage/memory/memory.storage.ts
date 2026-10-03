@@ -30,6 +30,36 @@ function push<T>(map: Map<string, T[]>, key: string, item: T, max: number): T[] 
   return list.length > max ? list.splice(0, list.length - max) : [];
 }
 
+/**
+ * Per-device append-only log keyed by record id, capped at `max`. Re-appending a known id
+ * replaces that record in place instead of duplicating it, which is what MQTT QoS 1
+ * redelivery needs (§6.5) and what the Firestore driver gets for free from a derived
+ * document id. A `Map` iterates in insertion order, so the log stays chronological.
+ */
+class Log<T extends { id: string; deviceCode: string }> {
+  private readonly byDevice = new Map<string, Map<string, T>>();
+  constructor(private readonly max: number) {}
+
+  set(record: T) {
+    let byId = this.byDevice.get(record.deviceCode);
+    if (!byId) {
+      byId = new Map();
+      this.byDevice.set(record.deviceCode, byId);
+    }
+    byId.set(record.id, clone(record));
+    while (byId.size > this.max) {
+      const oldest = byId.keys().next().value;
+      if (oldest === undefined) break;
+      byId.delete(oldest);
+    }
+  }
+
+  /** Oldest first. */
+  list(deviceCode: string): T[] {
+    return [...(this.byDevice.get(deviceCode)?.values() ?? [])];
+  }
+}
+
 class MemoryDevices implements DeviceStore {
   private readonly rows = new Map<string, DeviceRecord>();
 
@@ -46,28 +76,32 @@ class MemoryDevices implements DeviceStore {
 }
 
 class MemoryTelemetry implements TelemetryStore {
-  private readonly rows = new Map<string, TelemetryRecord[]>();
-  constructor(private readonly max: number) {}
+  private readonly log: Log<TelemetryRecord>;
+  constructor(max: number) {
+    this.log = new Log(max);
+  }
 
   async append(record: TelemetryRecord) {
-    push(this.rows, record.deviceCode, clone(record), this.max);
+    this.log.set(record);
   }
   async recent(deviceCode: string, since: Date, limit: number) {
     const from = since.toISOString();
-    const list = (this.rows.get(deviceCode) ?? []).filter((r) => r.measuredAt >= from);
+    const list = this.log.list(deviceCode).filter((r) => r.measuredAt >= from);
     return list.slice(-limit).map(clone);
   }
 }
 
 class MemoryEvents implements EventStore {
-  private readonly rows = new Map<string, EventRecord[]>();
-  constructor(private readonly max: number) {}
+  private readonly log: Log<EventRecord>;
+  constructor(max: number) {
+    this.log = new Log(max);
+  }
 
   async append(record: EventRecord) {
-    push(this.rows, record.deviceCode, clone(record), this.max);
+    this.log.set(record);
   }
   async recent(deviceCode: string, limit: number) {
-    return (this.rows.get(deviceCode) ?? []).slice(-limit).reverse().map(clone);
+    return this.log.list(deviceCode).slice(-limit).reverse().map(clone);
   }
 }
 

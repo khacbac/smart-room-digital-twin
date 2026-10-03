@@ -5,12 +5,16 @@ import type { Storage } from "./types";
 
 export type { Storage } from "./types";
 
-/** `STORAGE_DRIVER`: `memory` (default, works today) or `firestore` (stub for the cloud team). */
+/** `STORAGE_DRIVER`: `memory` (default, lost on restart) or `firestore` (Cloud Firestore). */
 export function createStorage(config: Config): Storage {
   switch (config.STORAGE_DRIVER) {
     case "memory":
       return createMemoryStorage();
     case "firestore":
-      return createFirestoreStorage({ projectId: config.GCP_PROJECT_ID });
+      // `GCP_PROJECT_ID` is required for this driver (checked in config/env.ts).
+      return createFirestoreStorage({
+        projectId: config.GCP_PROJECT_ID!,
+        databaseId: config.FIRESTORE_DATABASE_ID,
+      });
   }
 }

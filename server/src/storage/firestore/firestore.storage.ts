@@ -1,66 +1,208 @@
-import type { Storage } from "../types";
+import { randomUUID } from "node:crypto";
+import { applicationDefault, deleteApp, initializeApp, type App } from "firebase-admin/app";
+import {
+  getFirestore,
+  type DocumentSnapshot,
+  type Firestore,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
+  type Transaction,
+} from "firebase-admin/firestore";
+import type { CommandRecord, CommandStatus, DeviceRecord, EventRecord, TelemetryRecord } from "@srdt/contracts";
+import type { CommandStore, DeviceStore, EventStore, NewCommand, Storage, TelemetryStore } from "../types";
 
-// ─── MOCK / PLACEHOLDER ────────────────────────────────────────────────────────────
-// Firestore driver, to be written by the cloud team. Nothing here talks to Google Cloud
-// yet: `STORAGE_DRIVER=firestore` starts the backend with this stub, and every call
-// throws, so the gap is obvious instead of silently losing data.
+// Cloud Firestore driver. Same observable behaviour as the in-memory driver (see
+// memory/memory.storage.ts), so services never learn which one they are talking to.
+// Layout — docs/cloud.md §2:
 //
-// Suggested implementation (see docs/cloud.md for the full data model):
+//   devices/{code}
+//   devices/{code}/telemetry/{bootId}-{seq}   id is derived, so an MQTT redelivery is idempotent
+//   devices/{code}/events/{id}
+//   commands/{id}                             flat, with a `deviceCode` field
 //
-//   pnpm --filter @srdt/server add firebase-admin
-//
-//   import { initializeApp, applicationDefault } from "firebase-admin/app";
-//   import { getFirestore, FieldValue } from "firebase-admin/firestore";
-//
-//   const app = initializeApp({ credential: applicationDefault(), projectId: opts.projectId });
-//   const db = getFirestore(app);
-//
-//   devices   → devices/{code}                               (put = set(), list = get())
-//   telemetry → devices/{code}/telemetry/{bootId}-{seq}       (id makes duplicates idempotent)
-//   events    → devices/{code}/events/{id}
-//   commands  → commands/{id}   with field deviceCode         (transition = runTransaction:
-//               read → check status ∈ from → update → return, else null)
-//
-//   recent(...)       → where/orderBy/limit queries (add composite indexes in
-//                       cloud/firebase/firestore.indexes.json)
-//   listOpenBefore()  → where("status", "in", ["pending","sent"]).where("createdAt", "<", iso)
-//
-// Keep writes cheap: the telemetry service already downsamples (TELEMETRY_PERSIST_INTERVAL_SEC)
-// before calling `telemetry.append`, so Firestore gets ~1 write / 5 s / device, not one per MQTT message.
-// ───────────────────────────────────────────────────────────────────────────────────
+// Records are stored exactly as `@srdt/contracts` defines them: timestamps stay ISO
+// strings, which sort lexicographically the same way they sort chronologically, so range
+// queries and `orderBy` work without a Timestamp converter.
 
 export interface FirestoreOptions {
-  projectId?: string;
+  projectId: string;
+  /** Named database; defaults to the project's `(default)` one. */
+  databaseId?: string;
 }
 
-function notImplemented(what: string): never {
-  throw new Error(`firestore storage: ${what} is not implemented yet (see server/src/storage/firestore)`);
+const DEFAULT_DATABASE_ID = "(default)";
+
+const data = <T>(snap: DocumentSnapshot): T => snap.data() as T;
+const rows = <T>(snap: QuerySnapshot): T[] => snap.docs.map((d: QueryDocumentSnapshot) => d.data() as T);
+
+class FirestoreDevices implements DeviceStore {
+  constructor(private readonly db: Firestore) {}
+
+  private get col() {
+    return this.db.collection("devices");
+  }
+
+  async list() {
+    // Sorted here rather than with `orderBy` so the order matches the in-memory driver's
+    // `localeCompare`, and because the collection holds a handful of documents.
+    return rows<DeviceRecord>(await this.col.get()).sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  async get(code: string) {
+    const snap = await this.col.doc(code).get();
+    return snap.exists ? data<DeviceRecord>(snap) : null;
+  }
+
+  async put(device: DeviceRecord) {
+    await this.col.doc(device.code).set(device);
+  }
 }
 
-export function createFirestoreStorage(_opts: FirestoreOptions): Storage {
+class FirestoreTelemetry implements TelemetryStore {
+  constructor(private readonly db: Firestore) {}
+
+  private col(deviceCode: string) {
+    return this.db.collection("devices").doc(deviceCode).collection("telemetry");
+  }
+
+  async append(record: TelemetryRecord) {
+    await this.col(record.deviceCode).doc(record.id).set(record);
+  }
+
+  async recent(deviceCode: string, since: Date, limit: number) {
+    // `limit` applies to the *newest* samples in the window, so take them descending and
+    // flip, matching the in-memory `slice(-limit)`.
+    const snap = await this.col(deviceCode)
+      .where("measuredAt", ">=", since.toISOString())
+      .orderBy("measuredAt", "desc")
+      .limit(limit)
+      .get();
+    return rows<TelemetryRecord>(snap).reverse();
+  }
+}
+
+class FirestoreEvents implements EventStore {
+  constructor(private readonly db: Firestore) {}
+
+  private col(deviceCode: string) {
+    return this.db.collection("devices").doc(deviceCode).collection("events");
+  }
+
+  async append(record: EventRecord) {
+    await this.col(record.deviceCode).doc(record.id).set(record);
+  }
+
+  async recent(deviceCode: string, limit: number) {
+    const snap = await this.col(deviceCode).orderBy("createdAt", "desc").limit(limit).get();
+    return rows<EventRecord>(snap);
+  }
+}
+
+class FirestoreCommands implements CommandStore {
+  constructor(
+    private readonly db: Firestore,
+    private readonly now: () => number,
+  ) {}
+
+  private get col() {
+    return this.db.collection("commands");
+  }
+
+  async insert(cmd: NewCommand) {
+    // The id must be a UUID: `CommandService.handleAck` rejects any other shape, so an
+    // auto-generated Firestore id would make every ack look like garbage from the device.
+    const row: CommandRecord = {
+      id: randomUUID(),
+      ...cmd,
+      status: "pending",
+      reason: null,
+      ack: null,
+      createdAt: new Date(this.now()).toISOString(),
+      sentAt: null,
+      ackedAt: null,
+    };
+    await this.col.doc(row.id).set(row);
+    return row;
+  }
+
+  async transition(
+    id: string,
+    from: readonly CommandStatus[],
+    patch: Partial<Omit<CommandRecord, "id" | "deviceCode" | "createdAt">>,
+  ) {
+    const ref = this.col.doc(id);
+    // Compare-and-set, so the `sent` write and a racing ack cannot clobber each other (§6.6).
+    return this.db.runTransaction<CommandRecord | null>(async (tx: Transaction) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return null;
+      const current = data<CommandRecord>(snap);
+      if (!from.includes(current.status)) return null;
+      const next: CommandRecord = {
+        ...current,
+        ...patch,
+        id: current.id,
+        deviceCode: current.deviceCode,
+        createdAt: current.createdAt,
+      };
+      tx.set(ref, next);
+      return next;
+    });
+  }
+
+  async get(id: string) {
+    const snap = await this.col.doc(id).get();
+    return snap.exists ? data<CommandRecord>(snap) : null;
+  }
+
+  async listOpenBefore(before: Date) {
+    const snap = await this.col
+      .where("status", "in", ["pending", "sent"])
+      .where("createdAt", "<", before.toISOString())
+      .get();
+    return rows<CommandRecord>(snap);
+  }
+
+  async recent(deviceCode: string, limit: number) {
+    const snap = await this.col
+      .where("deviceCode", "==", deviceCode)
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
+    return rows<CommandRecord>(snap);
+  }
+}
+
+function createApp(opts: FirestoreOptions): App {
+  // A unique name keeps several instances (tests, emulator) from sharing one app.
+  const name = `srdt-firestore-${randomUUID()}`;
+  // The emulator needs no credentials; against the real service the Admin SDK reads
+  // GOOGLE_APPLICATION_CREDENTIALS (see server/.env.example).
+  return process.env.FIRESTORE_EMULATOR_HOST
+    ? initializeApp({ projectId: opts.projectId }, name)
+    : initializeApp({ credential: applicationDefault(), projectId: opts.projectId }, name);
+}
+
+export function createFirestoreStorage(opts: FirestoreOptions, now: () => number = Date.now): Storage {
+  const app = createApp(opts);
+  const db = getFirestore(app, opts.databaseId ?? DEFAULT_DATABASE_ID);
+  // `EventRecord.data` is open-shaped and optional fields elsewhere can be undefined;
+  // without this the first such write throws instead of simply omitting the field.
+  db.settings({ ignoreUndefinedProperties: true });
+
   return {
-    driver: "firestore (stub)",
-    devices: {
-      list: async () => notImplemented("devices.list"),
-      get: async () => notImplemented("devices.get"),
-      put: async () => notImplemented("devices.put"),
+    driver: "firestore",
+    devices: new FirestoreDevices(db),
+    telemetry: new FirestoreTelemetry(db),
+    events: new FirestoreEvents(db),
+    commands: new FirestoreCommands(db, now),
+    async ping() {
+      try {
+        await db.collection("devices").limit(1).get();
+        return true;
+      } catch {
+        return false;
+      }
     },
-    telemetry: {
-      append: async () => notImplemented("telemetry.append"),
-      recent: async () => notImplemented("telemetry.recent"),
-    },
-    events: {
-      append: async () => notImplemented("events.append"),
-      recent: async () => notImplemented("events.recent"),
-    },
-    commands: {
-      insert: async () => notImplemented("commands.insert"),
-      transition: async () => notImplemented("commands.transition"),
-      get: async () => notImplemented("commands.get"),
-      listOpenBefore: async () => notImplemented("commands.listOpenBefore"),
-      recent: async () => notImplemented("commands.recent"),
-    },
-    ping: async () => false,
-    close: async () => undefined,
+    close: () => deleteApp(app),
   };
 }

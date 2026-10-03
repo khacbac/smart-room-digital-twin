@@ -22,3 +22,5 @@ broker/mosquitto-data/
 # firebase
 .firebase/
 cloud/firebase/.firebaserc
+cloud/firebase/service-account.json 
+*-debug.log

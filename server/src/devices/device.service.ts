@@ -16,6 +16,8 @@ export interface DeviceServiceOptions {
   seed: readonly string[];
   /** `lastSeenAt` is stored/pushed at most this often unless something else changes. */
   seenWriteIntervalMs?: number;
+  /** The device document is written at most this often unless a durable field changed. */
+  persistIntervalMs?: number;
 }
 
 export interface PacketInfo {
@@ -28,6 +30,12 @@ export interface PacketInfo {
 export type OfflineReason = "lwt" | "no_data";
 
 export const SEEN_WRITE_INTERVAL_MS = 15_000;
+/**
+ * `reported` carries `uptimeSec`, `rssi` and `ts`, so it differs on every status message.
+ * Without this the document would be rewritten roughly every 10 s — measured at
+ * ~8 600 writes/day/device, more than the downsampled telemetry costs (docs/cloud.md §2).
+ */
+export const DEVICE_PERSIST_INTERVAL_MS = 60_000;
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -47,12 +55,15 @@ interface Tracked {
   /** Epoch ms of the last live message (the record's copy is throttled). */
   lastSeenAt: number | null;
   writtenSeenAt: number | null;
+  /** Epoch ms of the last `store.put`, `null` when the next commit must write. */
+  storedAt: number | null;
 }
 
 export class DeviceService {
   private readonly devices = new Map<string, Tracked>();
   private readonly registering = new Map<string, Promise<Tracked | null>>();
   private readonly seenWriteIntervalMs: number;
+  private readonly persistIntervalMs: number;
 
   constructor(
     private readonly store: DeviceStore,
@@ -63,6 +74,7 @@ export class DeviceService {
     private readonly now: () => number = Date.now,
   ) {
     this.seenWriteIntervalMs = opts.seenWriteIntervalMs ?? SEEN_WRITE_INTERVAL_MS;
+    this.persistIntervalMs = opts.persistIntervalMs ?? DEVICE_PERSIST_INTERVAL_MS;
   }
 
   /** Loads the devices from the store and creates the seed ones. Call before consuming MQTT. */
@@ -111,20 +123,20 @@ export class DeviceService {
     if (r.presence !== "online") {
       // Flip before the first await, so a concurrent message can't raise a second DEVICE_ONLINE.
       r.presence = "online";
-      await this.commit(d, true);
+      await this.commit(d, true, true);
       this.log.info({ device: code, bootId: r.bootId }, "device online");
       await this.events.server(code, "DEVICE_ONLINE", "info", "device online", { bootId: r.bootId });
       return;
     }
     const due = d.writtenSeenAt === null || now - d.writtenSeenAt >= this.seenWriteIntervalMs;
-    if (due || edgeChanged) await this.commit(d, true);
+    if (due || edgeChanged) await this.commit(d, true, edgeChanged);
   }
 
   async markOffline(code: string, reason: OfflineReason): Promise<void> {
     const d = this.devices.get(code);
     if (!d || d.record.presence === "offline") return;
     d.record.presence = "offline";
-    await this.commit(d, d.lastSeenAt !== null);
+    await this.commit(d, d.lastSeenAt !== null, true);
     this.log.info({ device: code, reason }, "device offline");
     await this.events.server(code, "DEVICE_OFFLINE", "warning", `device offline (${reason})`, { reason });
   }
@@ -136,17 +148,21 @@ export class DeviceService {
   async saveStatus(code: string, status: StatusOnline, receivedAtMs: number, retain: boolean): Promise<void> {
     const d = this.devices.get(code);
     if (!d) return;
+    const r = d.record;
+    // A reboot, a firmware change or an edge-state change has to survive a backend
+    // restart, so it is written now; the rest of `reported` can wait for the throttle.
+    const durable = status.bootId !== r.bootId || status.fw !== r.fwVersion || status.edgeState !== r.edgeState;
     const reported: ReportedState = {
       ...status,
       override: { ...status.override, expiresAt: overrideExpiresAt(status, receivedAtMs, retain) },
     };
-    Object.assign(d.record, {
+    Object.assign(r, {
       reported,
       fwVersion: status.fw,
       bootId: status.bootId,
       edgeState: status.edgeState,
     });
-    await this.commit(d, false);
+    await this.commit(d, false, durable);
   }
 
   /** §9.4 rule 1, every 10 s: online devices silent for DEVICE_OFFLINE_AFTER_SEC. */
@@ -159,19 +175,27 @@ export class DeviceService {
     }
   }
 
-  /** Pushes the record to dashboards and the store. `withSeen` copies the live `lastSeenAt` in. */
-  private async commit(d: Tracked, withSeen: boolean): Promise<void> {
+  /**
+   * Pushes the record to dashboards and, at most every `persistIntervalMs`, to the store.
+   * `withSeen` copies the live `lastSeenAt` in; `durable` forces the write for a change
+   * that must survive a restart (presence, reboot, firmware, edge state).
+   */
+  private async commit(d: Tracked, withSeen: boolean, durable = false): Promise<void> {
     const now = this.now();
     if (withSeen && d.lastSeenAt !== null) {
       d.record.lastSeenAt = iso(d.lastSeenAt);
       d.writtenSeenAt = d.lastSeenAt;
     }
     d.record.updatedAt = iso(now);
+    // The dashboard is live either way: only the store write is throttled.
     this.hub.publish(d.record.code, { type: "device", data: d.record });
+    if (!durable && d.storedAt !== null && now - d.storedAt < this.persistIntervalMs) return;
+    d.storedAt = now;
     try {
       await this.store.put(d.record);
     } catch (err) {
-      // the in-memory state stays authoritative
+      // the in-memory state stays authoritative; retry on the next commit
+      d.storedAt = null;
       this.log.error({ err, device: d.record.code }, "device not stored");
     }
   }
@@ -203,6 +227,7 @@ export class DeviceService {
       updatedAt: at,
     });
     await this.store.put(d.record);
+    d.storedAt = this.now();
     return d;
   }
 
@@ -213,6 +238,7 @@ export class DeviceService {
       // A record left `online` without a timestamp still gets swept if nothing arrives.
       lastSeenAt: seen ?? (record.presence === "online" ? this.now() : null),
       writtenSeenAt: seen,
+      storedAt: null,
     };
     this.devices.set(record.code, d);
     return d;
