@@ -43,6 +43,8 @@ export function toTelemetryRecord(
     windowAngle: msg.actuators.windowAngle,
     buzzer: msg.actuators.buzzer,
     overrideActive: msg.override.window || msg.override.buzzer,
+    mlState: msg.mlState ?? null,
+    aiControl: msg.aiControl ?? false,
   };
 }
 

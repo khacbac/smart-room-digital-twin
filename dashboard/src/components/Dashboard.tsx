@@ -73,6 +73,8 @@ export function Dashboard({ deviceCode }: { deviceCode: string }) {
         status={reported}
         now={now}
         dimmed={!online}
+        mlState={live ? live.mlState : undefined}
+        aiControl={live?.aiControl ?? false}
       />
 
       <div className="grid">

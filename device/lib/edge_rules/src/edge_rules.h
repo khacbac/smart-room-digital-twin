@@ -131,8 +131,16 @@ public:
     bool presence() const { return presence_; }
     bool dhtFault() const { return dhtFault_; }
 
+    // §8 TinyML controller hook. While enabled, the model's window angle and buzzer replace
+    // the §7.6 table for the automatic (non-overridden) actuators, except that DANGER still
+    // forces window 90 and buzzer on. Manual overrides keep precedence as before.
+    void setAiControl(bool enabled);
+    void setAiOutputs(int windowAngle, bool buzzer);  // after each inference
+    bool aiControl() const { return aiEnabled_; }
+
     int windowAngle() const { return window_; }
     int edgeWindowAngle() const { return edgeWindow_; }
+    int autoWindowAngle() const;  // what the automatic logic wants: rules, or the model
     bool buzzerOn() const;  // logical alarm state (§5.3)
     bool windowOverridden() const { return windowOv_.active; }
     bool buzzerOverridden() const { return buzzerOv_.active; }
@@ -165,6 +173,11 @@ private:
     int window_ = 0;
     int edgeWindow_ = 0;  // last angle set by the edge engine (§7.6 rule 4)
     Override windowOv_, buzzerOv_;
+
+    // §8 TinyML controller outputs (used while aiEnabled_)
+    bool aiEnabled_ = false;
+    int aiWindow_ = 0;
+    bool aiBuzzer_ = false;
 
     static const uint8_t kQueueSize = 8;
     Event queue_[kQueueSize] = {};

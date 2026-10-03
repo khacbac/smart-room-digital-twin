@@ -16,6 +16,7 @@
 #include "commands.h"
 #include "config.h"
 #include "display.h"
+#include "edge_ai.h"
 #include "edge_rules.h"
 #include "lcd_format.h"
 #include "net.h"
@@ -24,6 +25,17 @@
 
 static edge::Engine engine;
 static proto::CommandHandler commands;
+
+// §8 TinyML controller (lib/edge_ai): runs after every rule evaluation on the same
+// smoothed inputs; its decision drives the automatic actuators while `ai on`.
+static edge_ai::Controller ai;
+static bool aiControl = EDGE_AI_CONTROL_DEFAULT != 0;
+static uint32_t aiLastUs = 0;  // last inference time, for the serial log
+
+static proto::AiInfo aiInfo() {
+    const edge_ai::Inference& r = ai.current();
+    return {aiControl, r.valid, r.state};
+}
 
 // Raw readings, only for the serial log (§4.6 LDR direction check).
 static AnalogReading analog{};
@@ -46,6 +58,10 @@ static void printState(uint32_t nowMs) {
     printValue("light", engine.light(), 1);
     printValue("aq", engine.airQuality(), 1);
     Serial.printf(" pir=%d win=%d buzz=%d", engine.presence(), engine.windowAngle(), engine.buzzerOn());
+    const edge_ai::Inference& r = ai.current();
+    if (r.valid) {
+        Serial.printf(" ml=%s/%d/%d%s", edge::stateName(r.state), r.windowAngle, r.buzzer, aiControl ? "*" : "");
+    }
     if (engine.windowOverridden() || engine.buzzerOverridden()) {
         Serial.printf(" ov=%s%s%s(%lus)", engine.windowOverridden() ? "window" : "",
                       engine.windowOverridden() && engine.buzzerOverridden() ? "+" : "",
@@ -154,7 +170,8 @@ static void send(Channel ch, size_t len) {
 
 static void publishTelemetry() {
     if (!net::online()) return;
-    send(Channel::Telemetry, proto::buildTelemetry(engine, meta(true), payload, sizeof(payload)));
+    const proto::AiInfo info = aiInfo();
+    send(Channel::Telemetry, proto::buildTelemetry(engine, meta(true), payload, sizeof(payload), &info));
 }
 
 static void publishStatus(uint32_t nowMs) {
@@ -225,7 +242,20 @@ static void printHelp() {
         "  open [1-90]    OPEN_WINDOW (default 90) → window override\n"
         "  close          CLOSE_WINDOW → window override\n"
         "  buzz on|off    BUZZER_ON / BUZZER_OFF → buzzer override\n"
-        "  clear          CLEAR_OVERRIDE");
+        "  clear          CLEAR_OVERRIDE\n"
+        "  ai [on|off]    TinyML controller drives window/buzzer (rules stay the safety floor)");
+}
+
+static void printAi() {
+    const edge_ai::Inference& r = ai.current();
+    Serial.printf("[ai] model %s control=%s last=%lu us", edge_ai::version(), aiControl ? "on" : "off",
+                  (unsigned long)aiLastUs);
+    if (r.valid) {
+        Serial.printf(" -> %s window=%d buzzer=%d margin=%.1f\n", edge::stateName(r.state), r.windowAngle, r.buzzer,
+                      r.stateMargin);
+    } else {
+        Serial.println(" -> no valid input (DHT null)");
+    }
 }
 
 static void handleCommand(char* line, uint32_t nowMs) {
@@ -257,6 +287,12 @@ static void handleCommand(char* line, uint32_t nowMs) {
         engine.overrideBuzzer(!strcmp(arg, "on"), src, nowMs);
     } else if (!strcmp(cmd, "clear")) {
         engine.clearOverrides(edge::ClearReason::Command);
+    } else if (!strcmp(cmd, "ai")) {
+        if (arg && (!strcmp(arg, "on") || !strcmp(arg, "off"))) {
+            aiControl = !strcmp(arg, "on");
+            engine.setAiControl(aiControl);
+        }
+        printAi();
     } else {
         Serial.printf("[cmd] unknown: %s (type help)\n", cmd);
     }
@@ -319,6 +355,10 @@ void setup() {
 
     const uint32_t now = millis();
     engine.begin(now);
+    ai.reset();
+    engine.setAiControl(aiControl);
+    Serial.printf("[ai] TinyML model %s, control %s (type `ai on|off`)\n", edge_ai::version(),
+                  aiControl ? "on" : "off");
     // Sample right away so the first evaluation does not wait a full interval.
     lastSampleAt = now - SAMPLE_INTERVAL_MS;
     lastDhtAt = now - DHT_INTERVAL_MS;
@@ -360,6 +400,21 @@ void loop() {
         analog = sensors::readAnalog();
         engine.pushAnalog(analog.light, (float)analog.airQuality, sensors::readPresence());
         engine.evaluate(now);  // §7.1: after each sample
+
+        // §8: the model sees the same smoothed inputs as the rules. With a DHT fault the
+        // inputs are NaN, the inference is skipped and the engine falls back to the rules.
+        if (engine.ready()) {
+            const int64_t t0 = esp_timer_get_time();
+            const edge_ai::Inference r = ai.step(
+                {engine.temperature(), engine.humidity(), engine.airQuality(), engine.light(), engine.presence()});
+            aiLastUs = (uint32_t)(esp_timer_get_time() - t0);
+            if (r.valid) {
+                engine.setAiControl(aiControl);
+                engine.setAiOutputs(r.windowAngle, r.buzzer);
+            } else {
+                engine.setAiControl(false);  // rules only until the DHT is back
+            }
+        }
     }
 
     static NetCommand cmd;

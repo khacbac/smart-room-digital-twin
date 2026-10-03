@@ -200,6 +200,13 @@
 #define MIN_STATE_HOLD_MS 5000       // minimum time in a state before stepping down
 #define MANUAL_OVERRIDE_SEC 120      // D2
 
+// ---- TinyML controller (§8 Phase 7, lib/edge_ai) ---------------------------
+// 1 = the model drives window/buzzer at boot (rule-engine DANGER and manual overrides
+// still win); 0 = the model only reports `mlState`. Toggle at runtime with `ai on|off`.
+#ifndef EDGE_AI_CONTROL_DEFAULT
+#define EDGE_AI_CONTROL_DEFAULT 1
+#endif
+
 // Enter when ANY condition holds, exit allowed when ALL exit conditions hold (§7.4).
 #define DANGER_TEMP_ENTER 34.0f
 #define DANGER_TEMP_EXIT 33.0f

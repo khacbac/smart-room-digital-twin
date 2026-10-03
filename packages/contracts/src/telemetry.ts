@@ -16,6 +16,10 @@ export const Telemetry = z.object({
   edgeState: EdgeState,
   actuators: Actuators,
   override: z.object({ window: z.boolean(), buzzer: z.boolean() }),
+  // §8 TinyML (Phase 7): the on-device model's state (null = no valid input) and whether
+  // it currently drives the actuators. Optional: firmware/simulators without the model omit them.
+  mlState: EdgeState.nullable().optional(),
+  aiControl: z.boolean().optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 

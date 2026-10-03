@@ -60,7 +60,7 @@ void setEventKind(JsonDocument& doc, const char* type, const char* severity, con
 
 }  // namespace
 
-size_t buildTelemetry(const edge::Engine& engine, const Meta& meta, char* out, size_t size) {
+size_t buildTelemetry(const edge::Engine& engine, const Meta& meta, char* out, size_t size, const AiInfo* ai) {
     JsonDocument doc;
     setHeader(doc, meta);
     setRounded(doc, "temperature", engine.temperature());
@@ -73,6 +73,11 @@ size_t buildTelemetry(const edge::Engine& engine, const Meta& meta, char* out, s
     JsonObject o = doc["override"].to<JsonObject>();
     o["window"] = engine.windowOverridden();
     o["buzzer"] = engine.buzzerOverridden();
+    if (ai) {
+        if (ai->hasState) doc["mlState"] = edge::stateName(ai->state);
+        else doc["mlState"] = nullptr;
+        doc["aiControl"] = ai->control;
+    }
     return finish(doc, out, size);
 }
 

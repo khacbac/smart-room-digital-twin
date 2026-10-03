@@ -35,6 +35,7 @@ Dựng từ project `../smart-room`; số `§` trong code trỏ tới spec gốc
 7. [Sự cố thường gặp](#7-sự-cố-thường-gặp)
 8. [API backend](#8-api-backend)
 9. [Cấu trúc thư mục](#9-cấu-trúc-thư-mục)
+10. [TinyML: điều khiển tự động theo điều kiện phòng](#10-tinyml-điều-khiển-tự-động-theo-điều-kiện-phòng)
 
 ## 1. Cài đặt công cụ
 
@@ -226,6 +227,11 @@ pnpm --filter @srdt/server fake-device            # terminal 4
 Trong terminal đó gõ `hot` / `smoke` / `calm` + Enter để đẩy giá trị lên WARNING/DANGER hoặc về NORMAL. Nút trên
 dashboard (mở/đóng cửa, buzzer) được fake-device thực hiện và trả ack.
 
+fake-device cũng chạy **model TinyML** (cùng trọng số với firmware, xem [mục 10](#10-tinyml-điều-khiển-tự-động-theo-điều-kiện-phòng)):
+model quyết định góc cửa / còi, dashboard hiện "TinyML: … · driving". Preset thêm để thấy model khác rule engine:
+`humid` (nóng ẩm → mở 45°), `stuffy` (aq ≈ 680: có người → WARNING 90°, phòng trống → 60°), `cold` (lạnh → đóng), `night` / `day`,
+`people` / `empty`, `ai off|on` (tắt/bật model, chỉ còn rule), `ai` (xem quyết định hiện tại). `roam` vẫn dùng được cùng model.
+
 ### B. 1 mạch ESP32 trong Wokwi
 
 1. Build: `cd device && pio run -e esp32-s3` (hoặc trong VS Code: thanh trạng thái PlatformIO → chọn env
@@ -332,10 +338,10 @@ Kết quả mong đợi: telemetry mỗi 2 s trên `srdt/room-01/telemetry`, `st
 ## 6. Test
 
 ```sh
-pnpm test                          # contracts (27) + server (20) + link-sim (23)
+pnpm test                          # contracts (28) + server (36, gồm parity TinyML) + link-sim (23)
 pnpm typecheck
 pnpm build:dashboard               # static export ra dashboard/out
-cd device && pio test -e native    # firmware C++ trên PC: edge rules, protocol, link (100), cần gcc (§1.4)
+cd device && pio test -e native    # firmware C++ trên PC: edge rules, protocol, link, edge_ai (115), cần gcc (§1.4)
 cd device && pio run -e esp32-s3 -e node -e gateway -e kit -e node-kit   # build đủ firmware
 ```
 
@@ -376,15 +382,52 @@ Bản đồ chi tiết từng file: [`docs/architecture.md` §3](docs/architectu
 
 | Thư mục | Nội dung | Trạng thái |
 |---|---|---|
-| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi). `env:esp32-s3` = 1 mạch; `env:node` = mạch cảm biến, uplink qua UART1; `env:gateway` = Wi-Fi + MQTT, bridge sang node; `*-wokwi` = bản cho simulator; `native` = test trên PC | ✅ Wokwi (1 mạch và 2 mạch); 🟡 2 mạch thật chưa chạy |
+| `device/` | Firmware ESP32-S3 (PlatformIO + Wokwi). `env:esp32-s3` = 1 mạch; `env:node` = mạch cảm biến, uplink qua UART1; `env:gateway` = Wi-Fi + MQTT, bridge sang node; `*-wokwi` = bản cho simulator; `native` = test trên PC. `lib/edge_ai` = model TinyML int8 | ✅ Wokwi (1 mạch và 2 mạch); 🟡 2 mạch thật chưa chạy |
+| `ml/` | Pipeline TinyML: `policy.md` (chính sách gán nhãn cho LLM), `generate_data.py` (Gemini API / offline), `train.py` (torch → int8 → `model_data.h` + `model.json`), `reports/report.md` | ✅ xem [`ml/README.md`](ml/README.md) |
 | `broker/` | Config Mosquitto: `mosquitto.conf` (local), `mosquitto-lan.conf` (cho mạch thật) | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT + kiểu dữ liệu backend ⇄ dashboard | ✅ |
-| `server/` | Backend: MQTT ingest, presence, command round trip, REST + SSE, `scripts/fake-device.ts` | ✅ |
+| `server/` | Backend: MQTT ingest, presence, command round trip, REST + SSE, `scripts/fake-device.ts`, `scripts/edge-ai/` (suy luận TinyML bản TS) | ✅ |
 | `server/src/storage/` | Interface storage + driver `memory` và `firestore` (Cloud Firestore) | ✅ cả hai chạy được |
 | `tools/link-sim/` | fake-gateway / fake-node / splice cho phương án 2 mạch (serial, TCP, RFC 2217, MQTT tunnel) | ✅ |
 | `dashboard/` | Next.js 16 static export: value cards, room twin (SVG), chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` |
 | `cloud/` | Firestore rules + indexes (đã deploy); Firebase Hosting / Dockerfile Cloud Run vẫn là mock | 🟡 một phần |
 | `docs/` | [kiến trúc](docs/architecture.md), [link 2 mạch](docs/link-protocol.md), [cloud](docs/cloud.md), spec gốc | |
+
+## 10. TinyML: điều khiển tự động theo điều kiện phòng
+
+Spec §8 (Phase 7) chừa chỗ cho một model nhỏ chạy trên ESP32. Bản này làm xong và đi xa hơn: model
+**điều khiển** cửa sổ + còi chứ không chỉ phân loại, dữ liệu huấn luyện do **LLM Gemini** gán nhãn.
+
+```
+ ml/policy.md ─► Gemini (gemini-3.1-pro-preview qua API, hoặc bản offline viết thành code) ─► data/*.jsonl
+             ─► ml/train.py (torch, 5→24→12→12, int8) ─► device/lib/edge_ai/src/model_data.h  (firmware)
+                                                        └► server/scripts/edge-ai/model.json   (fake-device)
+```
+
+- **Đầu vào** 5 giá trị đã làm mượt: nhiệt độ, độ ẩm, chất lượng không khí, log ánh sáng, có người.
+  **Đầu ra**: trạng thái (4 lớp), góc cửa {0,20,30,45,60,70,90}, còi. 600 tham số, 552 B trọng số, suy luận
+  vài chục µs.
+- **Chính sách gán nhãn** (`ml/policy.md`) thêm ngữ cảnh mà rule engine không có: nóng + ẩm, có người (thông gió sớm từ aq 380,
+  WARNING sớm từ aq 650, còi sớm từ aq 800), ban đêm (giới hạn 30° khi có người ngủ), lạnh (< 18 °C → đóng),
+  phòng trống (không mở). Đồng ý với rule engine ≈ 86–90 % là chủ ý.
+- **An toàn**: rule engine vẫn là safety floor (`Engine::autoWindowAngle`): DANGER theo rule → cửa 90 + còi,
+  bất kể model. Override từ dashboard/nút vẫn thắng. DHT lỗi → model không có đầu vào → rule điều khiển.
+- **Bật/tắt**: `EDGE_AI_CONTROL_DEFAULT` trong `device/include/config.h` (mặc định 1); console `ai on|off`;
+  fake-device `ai on|off`. Telemetry thêm `mlState` + `aiControl`; dashboard hiện ở dải trạng thái.
+- **Dữ liệu**: 1844 kịch bản do Gemini 3.1 Pro gán nhãn qua API (khớp chính sách 100 % trạng thái/còi, 98.6 % góc)
+  gộp với 6344 kịch bản gán nhãn offline cùng chính sách = 8188 mẫu (`ml/data/gemini+offline.jsonl`).
+- **Kết quả** ([`ml/reports/report.md`](ml/reports/report.md)): state accuracy 96.7 %, macro F1 0.965, sai số góc 1.6°,
+  DANGER recall so với rule 95.7 % (phần còn lại do safety floor của rule engine bù). Test: `pio test -e native -f test_edge_ai` (15),
+  `server/test/edge-ai.test.ts`.
+- Chi tiết, cách sinh lại dữ liệu bằng Gemini API (`GEMINI_API_KEY`) và train lại: [`ml/README.md`](ml/README.md).
+
+## Đã kiểm tra (2026-10-03, TinyML)
+
+- [x] `pnpm test` xanh (28 contracts + server gồm parity TinyML + 23 link-sim), `pnpm typecheck` sạch
+- [x] `pio test -e native` 115/115 (gồm edge_ai 15); `pio run -e esp32-s3` SUCCESS (flash +3.6 KB)
+- [x] Gemini API gán nhãn 1844 kịch bản (47 lô, có retry mạng + `--resume`), train lại trên bộ gộp, parity C++/TS pass
+- [x] fake-device + model (snapshot qua REST): `humid` → UNCOMFORTABLE, cửa 45° (rule engine giữ 0°); aq 627 có người
+      → 60°; `calm` → NORMAL 0°; `ai off` → `aiControl:false`, về rule; dashboard hiện `TinyML: … · driving`
 
 ## Đã kiểm tra (2026-09-30)
 

@@ -1,15 +1,19 @@
 import { randomBytes } from "node:crypto";
 import mqtt from "mqtt";
 import { CommandMessage, type EdgeState } from "@srdt/contracts";
+import { Controller, loadModel } from "./edge-ai/infer";
 
 // A stand-in for the ESP32 when Wokwi is not running: same topics and payloads as the
 // firmware (device/lib/protocol), telemetry every 2 s, status on change + every 30 s,
 // commands executed and acked. Values follow a slow random walk; the edge state uses the
 // ENTER thresholds only (no hysteresis/hold, the real rules are in device/lib/edge_rules).
+// The TinyML controller (server/scripts/edge-ai, same int8 weights as device/lib/edge_ai)
+// drives window/buzzer like the firmware does; the rule state stays the safety floor.
 //
-//   pnpm --filter @srdt/server fake-device            (env: MQTT_URL, MQTT_TOPIC_PREFIX, DEVICE_ID)
+//   pnpm --filter @srdt/server fake-device            (env: MQTT_URL, MQTT_TOPIC_PREFIX, DEVICE_ID, AI_CONTROL=0)
 //   FAKE_ROAM=1 pnpm --filter @srdt/server fake-device   start roaming right away
-//   stdin: hot | smoke | calm | roam [off] | set <°C> <aq> [rh]
+//   stdin: hot | smoke | calm | humid | stuffy | cold | night | day | people | empty
+//          | roam [off] | set <°C> <aq> [rh] | ai [on|off]
 
 const url = process.env.MQTT_URL ?? "mqtt://127.0.0.1:1883";
 const prefix = process.env.MQTT_TOPIC_PREFIX ?? "srdt";
@@ -22,18 +26,30 @@ let seq = 0;
 const startedAt = Date.now();
 const sensors = { temperature: 26.5, humidity: 62, light: 450, airQuality: 300, presence: true };
 type Target = { temperature: number; humidity: number; light: number; airQuality: number };
-type Preset = "hot" | "smoke" | "calm";
-const PRESETS: Record<Preset, Target> = {
+// The first three match the original presets; the rest exercise the model's extra context
+// (humidity, early ventilation, cold, night) that the rule engine ignores. Partial presets
+// only move the named values.
+const PRESETS: Record<string, Partial<Target>> = {
   hot: { temperature: 35, humidity: 62, light: 450, airQuality: 400 },
   smoke: { temperature: 27, humidity: 62, light: 450, airQuality: 950 },
   calm: { temperature: 26.5, humidity: 62, light: 450, airQuality: 300 },
+  humid: { temperature: 28.5, humidity: 80 },
+  stuffy: { airQuality: 680 }, // people: WARNING 90°, empty: UNCOMFORTABLE 60°
+  cold: { temperature: 15, humidity: 50 },
+  night: { light: 3 },
+  day: { light: 450 },
 };
-let target: Target = { ...PRESETS.calm };
+let target: Target = { temperature: 26.5, humidity: 62, light: 450, airQuality: 300 };
+let presenceFlips = true; // random 5 % presence flips (off after `people` / `empty`)
 let edgeState: EdgeState = "NORMAL";
 let autoWindow = 0;
 let windowOverride: { angle: number; until: number } | null = null;
 let buzzerOverride: { on: boolean; until: number } | null = null;
 const seen = new Map<string, string>(); // commandId → ack status (dedup like the firmware)
+
+const model = loadModel();
+const ai = new Controller(model);
+let aiControl = process.env.AI_CONTROL !== "0";
 
 function evaluate(): EdgeState {
   const { temperature: t, humidity: h, airQuality: aq } = sensors;
@@ -65,8 +81,18 @@ function roam() {
 }
 
 const now = () => Date.now();
-const windowAngle = () => (windowOverride ? windowOverride.angle : autoWindow);
-const buzzer = () => (buzzerOverride ? buzzerOverride.on : edgeState === "DANGER");
+// Automatic actuators: the model while `ai on` (DANGER still forces 90 / buzzer), else the rules.
+const aiActive = () => aiControl && ai.decision.valid;
+const windowAngle = () => {
+  if (windowOverride) return windowOverride.angle;
+  if (edgeState === "DANGER") return 90;
+  return aiActive() ? ai.decision.windowAngle : autoWindow;
+};
+const buzzer = () => {
+  if (buzzerOverride) return buzzerOverride.on;
+  if (edgeState === "DANGER") return true;
+  return aiActive() && ai.decision.buzzer;
+};
 const expiresInSec = () => {
   const until = Math.max(windowOverride?.until ?? 0, buzzerOverride?.until ?? 0);
   return until ? Math.max(0, Math.ceil((until - now()) / 1000)) : 0;
@@ -130,6 +156,8 @@ function telemetry() {
     edgeState,
     actuators: actuators(),
     override: override(),
+    mlState: ai.decision.valid ? ai.decision.state : null,
+    aiControl,
   });
 }
 
@@ -138,8 +166,30 @@ function tick() {
   sensors.temperature = drift(sensors.temperature, target.temperature, 0.2);
   sensors.airQuality = Math.max(0, Math.min(1000, drift(sensors.airQuality, target.airQuality, 10)));
   sensors.humidity = Math.max(0, Math.min(100, drift(sensors.humidity, target.humidity, 0.5)));
-  sensors.light = Math.max(0, drift(sensors.light, target.light, 20));
-  if (Math.random() < 0.05) sensors.presence = !sensors.presence;
+  sensors.light = Math.max(0, drift(sensors.light, target.light, target.light < 50 ? 2 : 20));
+  if (presenceFlips && Math.random() < 0.05) sensors.presence = !sensors.presence;
+
+  // TinyML step on the rounded values the telemetry carries (same inputs as the firmware's smoothed ones)
+  const beforeAi = { ...ai.decision };
+  const decision = ai.step({
+    temperature: Math.round(sensors.temperature * 10) / 10,
+    humidity: Math.round(sensors.humidity * 10) / 10,
+    airQuality: Math.round(sensors.airQuality),
+    light: Math.round(sensors.light * 10) / 10,
+    presence: sensors.presence,
+  });
+  const aiChanged =
+    decision.valid !== beforeAi.valid ||
+    decision.state !== beforeAi.state ||
+    decision.windowAngle !== beforeAi.windowAngle ||
+    decision.buzzer !== beforeAi.buzzer;
+  if (aiChanged) {
+    console.log(
+      `[fake] ml -> ${decision.state} window ${decision.windowAngle}° buzzer ${decision.buzzer ? "on" : "off"}` +
+        ` (margin ${decision.stateMargin.toFixed(1)})${aiControl ? "" : " [advisory]"}`,
+    );
+    if (aiControl) status();
+  }
 
   for (const [name, ov] of [["window", windowOverride], ["buzzer", buzzerOverride]] as const) {
     if (ov && now() >= ov.until) {
@@ -186,6 +236,7 @@ function execute(cmd: CommandMessage) {
 
 client.on("connect", () => {
   console.log(`[fake] connected to ${url} as ${deviceId} (bootId ${bootId}), prefix ${prefix}`);
+  console.log(`[fake] TinyML model ${model.version}, control ${aiControl ? "on" : "off"} (stdin: ai on|off)`);
   client.subscribe(topic("command"), { qos: 1 });
   status();
   event("BOOT", "info", "device booted", { fw: "fake-0.1.0", resetReason: "POWERON" });
@@ -224,17 +275,24 @@ setInterval(status, 30_000);
 setInterval(() => roaming && roam(), ROAM_INTERVAL_SEC * 1000);
 if (roaming) roam();
 
-const HELP = "[fake] stdin: hot | smoke | calm | roam [off] | set <°C> <aq> [rh]";
+const HELP =
+  "[fake] stdin: hot | smoke | calm | humid | stuffy | cold | night | day | people | empty" +
+  " | roam [off] | set <°C> <aq> [rh] | ai [on|off]";
 
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (text: string) => {
   for (const raw of text.split(/\r?\n/)) {
     const [cmd, ...args] = raw.trim().split(/\s+/);
     if (!cmd) continue;
-    if (cmd === "hot" || cmd === "smoke" || cmd === "calm") {
+    const preset = PRESETS[cmd];
+    if (preset) {
       roaming = false;
-      target = { ...PRESETS[cmd] };
+      target = { ...target, ...preset };
       console.log(`[fake] steering toward ${cmd}`);
+    } else if (cmd === "people" || cmd === "empty") {
+      sensors.presence = cmd === "people";
+      presenceFlips = false;
+      console.log(`[fake] presence ${sensors.presence} (random flips off)`);
     } else if (cmd === "roam") {
       roaming = args[0] !== "off";
       if (roaming) roam();
@@ -251,6 +309,16 @@ process.stdin.on("data", (text: string) => {
       roaming = false;
       target = { ...target, temperature: t, airQuality: aq, humidity: Number.isFinite(rh) ? rh : target.humidity };
       console.log(`[fake] target ${t}°C aq ${aq} rh ${target.humidity.toFixed(0)}`);
+    } else if (cmd === "ai") {
+      if (args[0] === "on" || args[0] === "off") {
+        aiControl = args[0] === "on";
+        status();
+      }
+      const d = ai.decision;
+      console.log(
+        `[fake] ai control ${aiControl ? "on" : "off"}; model ${model.version} -> ` +
+          (d.valid ? `${d.state} window ${d.windowAngle}° buzzer ${d.buzzer ? "on" : "off"}` : "no input"),
+      );
     } else console.log(HELP);
   }
 });

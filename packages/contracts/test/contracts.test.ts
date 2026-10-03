@@ -77,6 +77,14 @@ describe("Telemetry", () => {
     const { light: _light, ...rest } = telemetry;
     expect(Telemetry.safeParse(rest).success).toBe(false);
   });
+
+  it("accepts the optional §8 TinyML fields and rejects a bad mlState", () => {
+    expect(Telemetry.safeParse({ ...telemetry, mlState: "UNCOMFORTABLE", aiControl: true }).success).toBe(true);
+    expect(Telemetry.safeParse({ ...telemetry, mlState: null, aiControl: false }).success).toBe(true);
+    expect(Telemetry.safeParse({ ...telemetry, mlState: "PANIC" }).success).toBe(false);
+    const parsed = Telemetry.parse(telemetry);
+    expect(parsed.mlState).toBeUndefined(); // firmware without the model
+  });
 });
 
 describe("Status (union on online, §5.4)", () => {

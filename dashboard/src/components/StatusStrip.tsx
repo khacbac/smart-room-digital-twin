@@ -18,8 +18,17 @@ export function StatusStrip(props: {
   status: ReportedState | null;
   now: number;
   dimmed: boolean;
+  /** §8 TinyML: model state from the latest telemetry (undefined = device sends none). */
+  mlState?: EdgeState | null;
+  aiControl?: boolean;
 }) {
   const state = props.edgeState;
+  const mlText =
+    props.mlState === undefined
+      ? null
+      : props.mlState === null
+        ? "no input"
+        : `${STATE_LABEL[props.mlState]} · ${props.aiControl ? "driving" : "advisory"}`;
   return (
     <section className={`card strip${props.dimmed ? " dimmed" : ""}`} aria-label="Device state">
       <div className="strip-state" style={state ? { background: STATE_COLOR[state] } : undefined}>
@@ -39,6 +48,17 @@ export function StatusStrip(props: {
           <dt>Override</dt>
           <dd>{overrideText(props.status?.override, props.now)}</dd>
         </div>
+        {mlText !== null && (
+          <div>
+            <dt>TinyML</dt>
+            <dd
+              style={props.mlState ? { color: STATE_COLOR[props.mlState] } : undefined}
+              title="On-device model (ml/policy.md). 'driving' = it sets window/buzzer; the rule engine stays the safety floor"
+            >
+              {mlText}
+            </dd>
+          </div>
+        )}
         {props.status && (
           <div className="strip-meta">
             <dt>Device</dt>

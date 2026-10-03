@@ -244,7 +244,29 @@ void Engine::changeState(State to, uint8_t reasons, uint32_t nowMs) {
         if (windowOv_.active && to > windowOv_.levelAtSet) endWindowOverride(ClearReason::Escalation);
         if (buzzerOv_.active && to > buzzerOv_.levelAtSet) endBuzzerOverride(ClearReason::Escalation);
     }
-    if (!windowOv_.active) window_ = edgeWindow_;
+    if (!windowOv_.active) window_ = autoWindowAngle();
+}
+
+// ---- §8 TinyML controller ----------------------------------------------------------
+
+int Engine::autoWindowAngle() const {
+    if (!aiEnabled_) return edgeWindow_;
+    if (state_ == State::Danger) return WINDOW_ANGLE_MAX;  // safety floor
+    return aiWindow_;
+}
+
+void Engine::setAiControl(bool enabled) {
+    if (aiEnabled_ == enabled) return;
+    aiEnabled_ = enabled;
+    if (!windowOv_.active) window_ = autoWindowAngle();
+}
+
+void Engine::setAiOutputs(int windowAngle, bool buzzer) {
+    if (windowAngle < 0) windowAngle = 0;
+    if (windowAngle > WINDOW_ANGLE_MAX) windowAngle = WINDOW_ANGLE_MAX;
+    aiWindow_ = windowAngle;
+    aiBuzzer_ = buzzer;
+    if (aiEnabled_ && !windowOv_.active) window_ = autoWindowAngle();
 }
 
 void Engine::onButton(Press press, uint32_t nowMs) {
@@ -303,7 +325,7 @@ void Engine::endWindowOverride(ClearReason reason) {
     if (reason == ClearReason::Escalation && holdsWindow(state_) && window_ > edgeWindow_) {
         edgeWindow_ = window_;
     }
-    window_ = edgeWindow_;
+    window_ = autoWindowAngle();
 
     Event e{};
     e.type = EventType::OverrideCleared;
@@ -323,7 +345,9 @@ void Engine::endBuzzerOverride(ClearReason reason) {
 }
 
 bool Engine::buzzerOn() const {
-    return buzzerOv_.active ? buzzerOv_.value : state_ == State::Danger;
+    if (buzzerOv_.active) return buzzerOv_.value;
+    if (state_ == State::Danger) return true;  // safety floor, with or without the model
+    return aiEnabled_ && aiBuzzer_;
 }
 
 uint32_t Engine::overrideExpiresInSec(uint32_t nowMs) const {

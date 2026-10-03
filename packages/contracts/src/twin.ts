@@ -48,6 +48,10 @@ export interface TelemetryRecord {
   windowAngle: number;
   buzzer: boolean;
   overrideActive: boolean;
+  /** §8 TinyML: model state (null when the device has no model or no valid input). */
+  mlState: EdgeState | null;
+  /** §8 TinyML: the model drives window/buzzer (rules stay the safety floor). */
+  aiControl: boolean;
 }
 
 export interface EventRecord {

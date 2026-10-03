@@ -31,9 +31,18 @@ struct StatusInfo {
     int rssi;
 };
 
+// TinyML fields (spec §8 Phase 7): `mlState` is the model's state (null when the model has
+// no valid input), `aiControl` says whether the model drives the actuators right now.
+struct AiInfo {
+    bool control;
+    bool hasState;
+    edge::State state;
+};
+
 // §5.3. Values are the smoothed ones, rounded to 1 decimal; temperature/humidity
-// are null while there is no valid DHT22 value.
-size_t buildTelemetry(const edge::Engine& engine, const Meta& meta, char* out, size_t size);
+// are null while there is no valid DHT22 value. `ai` adds mlState/aiControl when given.
+size_t buildTelemetry(const edge::Engine& engine, const Meta& meta, char* out, size_t size,
+                      const AiInfo* ai = nullptr);
 
 // §5.4, `online: true`. The LWT (`online: false`) is a static string in net_task.
 size_t buildStatus(const edge::Engine& engine, const Meta& meta, const StatusInfo& info, uint32_t nowMs,
