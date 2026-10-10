@@ -1,6 +1,6 @@
 import type { StreamMessage, StreamType } from "@srdt/contracts";
 import { config } from "../config";
-import type { TwinHandlers, TwinSource } from "./types";
+import type { TwinHandlers, TwinSource } from "@srdt/twin-core";
 
 const TYPES: StreamType[] = ["snapshot", "device", "telemetry", "event", "command"];
 const RETRY_MS = 3000;

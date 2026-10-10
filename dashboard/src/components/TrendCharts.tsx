@@ -13,9 +13,8 @@ import {
   YAxis,
 } from "recharts";
 import type { EdgeState, TelemetryRecord } from "@srdt/contracts";
-import { HISTORY_MS } from "@/hooks/useTwin";
 import { STATE_COLOR } from "@/lib/format";
-import { AQ_LINES, HUMIDITY_LINES, TEMP_LINES } from "@/lib/thresholds";
+import { AQ_LINES, HISTORY_MS, HUMIDITY_LINES, TEMP_LINES } from "@srdt/twin-core";
 
 // Last 15 minutes, from what the data source has sent (snapshot + live messages).
 // Longer ranges (1 h / 24 h) need the cloud storage and a query API: see docs/cloud.md.

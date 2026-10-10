@@ -1,12 +1,6 @@
 import { ChevronRight, House, Radio } from "lucide-react";
 import type { DevicePresence } from "@srdt/contracts";
-import { ago } from "@/lib/format";
-
-const PRESENCE_LABEL: Record<DevicePresence, string> = {
-  online: "Online",
-  offline: "Offline",
-  unknown: "Unknown",
-};
+import { PRESENCE_LABEL, ago } from "@srdt/twin-core";
 
 export function Header(props: {
   deviceName: string;

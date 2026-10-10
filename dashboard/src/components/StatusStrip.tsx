@@ -1,11 +1,6 @@
 import type { EdgeState, ReportedState } from "@srdt/contracts";
-import {
-  STATE_COLOR,
-  STATE_LABEL,
-  countdown,
-  toMs,
-  windowLabel,
-} from "@/lib/format";
+import { STATE_LABEL, mlText as describeMl, overrideText, windowLabel } from "@srdt/twin-core";
+import { STATE_COLOR } from "@/lib/format";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -14,22 +9,6 @@ import {
   Sparkles,
   Hand,
 } from "lucide-react";
-
-function overrideText(
-  override: ReportedState["override"] | undefined,
-  now: number,
-): string {
-  if (!override) return "Awaiting state";
-  if (!override.window && !override.buzzer) return "Automatic";
-  const which = [override.window && "Window", override.buzzer && "alarm"]
-    .filter(Boolean)
-    .join(" + ");
-  const expires = toMs(override.expiresAt);
-  // expiresAt is null for a retained status without a valid ts (§9.3): no countdown then
-  if (expires === null) return which;
-  const left = (expires - now) / 1000;
-  return left > 0 ? `${which} (${countdown(left)})` : `${which} (ending…)`;
-}
 
 export function StatusStrip(props: {
   edgeState: EdgeState | null;
@@ -43,12 +22,7 @@ export function StatusStrip(props: {
   aiControl?: boolean;
 }) {
   const state = props.edgeState;
-  const mlText =
-    props.mlState === undefined
-      ? null
-      : props.mlState === null
-        ? "no input"
-        : `${STATE_LABEL[props.mlState]} · ${props.aiControl ? "active" : "advisory"}`;
+  const mlText = describeMl(props.mlState, props.aiControl ?? false);
   return (
     <section
       className={`card strip${props.dimmed ? " dimmed" : ""}`}

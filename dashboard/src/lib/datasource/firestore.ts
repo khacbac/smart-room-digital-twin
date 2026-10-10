@@ -1,4 +1,4 @@
-import type { TwinSource } from "./types";
+import type { TwinSource } from "@srdt/twin-core";
 
 // ─── MOCK / PLACEHOLDER ────────────────────────────────────────────────────────────
 // Firestore data source, for the cloud team. Selected with NEXT_PUBLIC_DATA_SOURCE=firestore.

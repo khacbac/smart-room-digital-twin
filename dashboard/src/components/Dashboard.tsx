@@ -1,9 +1,9 @@
 "use client";
 
-import { latest, useTwin } from "@/hooks/useTwin";
+import { useTwin } from "@/hooks/useTwin";
 import { useNow } from "@/hooks/useNow";
 import { twinSource } from "@/lib/datasource";
-import { toMs } from "@/lib/format";
+import { deriveRoomView, latest } from "@srdt/twin-core";
 import { House, LoaderCircle, RefreshCw } from "lucide-react";
 import { Controls, useCommandSender } from "./Controls";
 import { EventList } from "./EventList";
@@ -13,9 +13,6 @@ import { StatusStrip } from "./StatusStrip";
 import { TrendCharts } from "./TrendCharts";
 import { ValueCards } from "./ValueCards";
 import { Sidebar } from "./Sidebar";
-
-/** Online, but the newest telemetry is older than this → "Stale data". */
-const STALE_AFTER_MS = 15_000;
 
 export function Dashboard({ deviceCode }: { deviceCode: string }) {
   const twin = useTwin(deviceCode);
@@ -76,21 +73,10 @@ export function Dashboard({ deviceCode }: { deviceCode: string }) {
   }
 
   const { device } = twin;
-  const live = latest(twin);
+  const live = latest(twin.telemetry);
   const reported = device.reported;
-  const online = device.presence === "online";
-  // Receive times, not the device's measuredAt: a slow simulator makes the device clock lag.
-  const lastSeenAt =
-    Math.max(twin.lastTelemetryAt ?? 0, toMs(device.lastSeenAt) ?? 0) || null;
-  const stale =
-    online &&
-    twin.lastTelemetryAt !== null &&
-    now - twin.lastTelemetryAt > STALE_AFTER_MS;
-
-  // Actuators: the reported status is sent right after every change, telemetry every 2 s.
-  const windowAngle =
-    reported?.actuators.windowAngle ?? live?.windowAngle ?? null;
-  const buzzer = reported?.actuators.buzzer ?? live?.buzzer ?? null;
+  const { online, lastSeenAt, stale, edgeState, windowAngle, buzzer, mlState, aiControl } =
+    deriveRoomView(device, live, twin.lastTelemetryAt, now);
 
   return (
     <div className="app-shell">
@@ -119,14 +105,14 @@ export function Dashboard({ deviceCode }: { deviceCode: string }) {
         />
 
         <StatusStrip
-          edgeState={live?.edgeState ?? device.edgeState}
+          edgeState={edgeState}
           windowAngle={windowAngle}
           buzzer={buzzer}
           status={reported}
           now={now}
           dimmed={!online}
-          mlState={live ? live.mlState : undefined}
-          aiControl={live?.aiControl ?? false}
+          mlState={mlState}
+          aiControl={aiControl}
         />
 
         <div className="grid">
@@ -139,7 +125,7 @@ export function Dashboard({ deviceCode }: { deviceCode: string }) {
                   : device.name
               }
               view={{
-                edgeState: live?.edgeState ?? device.edgeState,
+                edgeState,
                 windowAngle,
                 buzzer,
                 windowOverride: reported?.override.window ?? false,

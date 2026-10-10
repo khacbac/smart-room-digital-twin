@@ -10,7 +10,8 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { EdgeState } from "@srdt/contracts";
-import { STATE_COLOR, STATE_LABEL, fmt, windowLabel } from "@/lib/format";
+import { STATE_LABEL, fmt, windowLabel } from "@srdt/twin-core";
+import { STATE_COLOR } from "@/lib/format";
 
 // All live indicators mirror reported device state. The photo is illustrative.
 export interface TwinView {

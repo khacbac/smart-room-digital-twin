@@ -7,13 +7,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { EdgeState, TelemetryRecord } from "@srdt/contracts";
-import { STATE_COLOR, STATE_LABEL, fmt } from "@/lib/format";
 import {
   AQ_LINES,
   HUMIDITY_LINES,
+  STATE_LABEL,
   TEMP_LINES,
+  fmt,
   levelFor,
-} from "@/lib/thresholds";
+} from "@srdt/twin-core";
+import { STATE_COLOR } from "@/lib/format";
 
 function Card(props: {
   label: string;

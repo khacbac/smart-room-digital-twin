@@ -1,6 +1,6 @@
 import { Activity, CheckCheck, CircleAlert, Clock3 } from "lucide-react";
 import type { EventRecord } from "@srdt/contracts";
-import { clockTime } from "@/lib/format";
+import { clockTime } from "@srdt/twin-core";
 
 function detail(e: EventRecord): string {
   if (e.type === "STATE_CHANGED") {

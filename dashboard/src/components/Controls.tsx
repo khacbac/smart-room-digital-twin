@@ -8,6 +8,15 @@ import type {
   ReportedState,
 } from "@srdt/contracts";
 import {
+  ACTION_LABEL,
+  apiErrorText,
+  clockTime,
+  isBusy,
+  isOpenStatus as isOpen,
+  resultText,
+  windowLabel,
+} from "@srdt/twin-core";
+import {
   ArrowUpRight,
   History,
   PanelsTopLeft,
@@ -18,60 +27,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ApiError, sendCommand, type CommandBody } from "@/lib/api";
-import { clockTime, toMs, windowLabel } from "@/lib/format";
 import { useToast } from "./Toasts";
 
 // Manual control: POST → the button stays pending until the command is final → toast.
 // The actuator state itself comes from the device's reported state, never assumed here.
-
-type Group = "window" | "buzzer" | "all";
-
-const ACTION_LABEL: Record<CommandAction, string> = {
-  OPEN_WINDOW: "Open window",
-  CLOSE_WINDOW: "Close window",
-  BUZZER_ON: "Turn alarm on",
-  BUZZER_OFF: "Silence alarm",
-  CLEAR_OVERRIDE: "Resume automatic control",
-  PING: "Check connection",
-};
-
-const GROUP: Record<CommandAction, Group | null> = {
-  OPEN_WINDOW: "window",
-  CLOSE_WINDOW: "window",
-  BUZZER_ON: "buzzer",
-  BUZZER_OFF: "buzzer",
-  CLEAR_OVERRIDE: "all",
-  PING: null,
-};
-
-const isOpen = (s: CommandStatus) => s === "pending" || s === "sent";
-
-function conflicts(a: Group | null, b: Group | null): boolean {
-  if (!a || !b) return false;
-  return a === "all" || b === "all" || a === b;
-}
-
-function resultText(c: CommandRecord): string {
-  switch (c.status) {
-    case "executed": {
-      const created = toMs(c.createdAt);
-      const acked = toMs(c.ackedAt);
-      const took =
-        created !== null && acked !== null
-          ? ` in ${((acked - created) / 1000).toFixed(1)} s`
-          : "";
-      return `${ACTION_LABEL[c.action]} completed${took}`;
-    }
-    case "rejected":
-      return `${ACTION_LABEL[c.action]} rejected by the device (${c.reason ?? "no reason"})`;
-    case "failed":
-      return `${ACTION_LABEL[c.action]} failed (${c.reason ?? "unknown"})`;
-    case "timeout":
-      return `${ACTION_LABEL[c.action]}: device did not respond in time`;
-    default:
-      return `${ACTION_LABEL[c.action]} ${c.status}`;
-  }
-}
 
 /** Sends a command and toasts its final status. */
 export function useCommandSender(
@@ -112,13 +71,7 @@ export function useCommandSender(
     } catch (err) {
       const text =
         err instanceof ApiError
-          ? err.code === "DEVICE_OFFLINE"
-            ? "Device is offline"
-            : err.code === "BROKER_DISCONNECTED"
-              ? "Backend is not connected to the MQTT broker"
-              : err.code === "RATE_LIMITED"
-                ? "Too many commands, wait a moment"
-                : err.message
+          ? apiErrorText(err.code, err.message)
           : String(err);
       toast("error", `${ACTION_LABEL[body.action]}: ${text}`);
     } finally {
@@ -130,13 +83,8 @@ export function useCommandSender(
   };
 
   /** Busy while a request for a conflicting actuator is in flight or its command is still open. */
-  const busy = (action: CommandAction) => {
-    const g = GROUP[action];
-    return (
-      requesting.some((a) => conflicts(GROUP[a], g)) ||
-      commands.some((c) => isOpen(c.status) && conflicts(GROUP[c.action], g))
-    );
-  };
+  const busy = (action: CommandAction) =>
+    isBusy(action, requesting, commands);
 
   return { send, busy };
 }
