@@ -15,7 +15,13 @@ import { connectionHint, networkMode } from "@/lib/connection-hints";
 import { haptics } from "@/lib/haptics";
 import { pushToast } from "@/lib/toast";
 import { useTheme } from "@/lib/theme/theme";
-import { apiBaseUrlAtom, deviceCodeAtom, isValidDeviceCode, normaliseBaseUrl } from "../_atoms/settings";
+import {
+  DEFAULT_API_BASE_URL,
+  apiBaseUrlAtom,
+  deviceCodeAtom,
+  isValidDeviceCode,
+  normaliseBaseUrl,
+} from "../_atoms/settings";
 import { Field } from "./field";
 import { Touchable } from "@/components/touchable";
 
@@ -82,7 +88,7 @@ export function ConnectionSection() {
           value={url}
           onChangeText={setUrl}
           keyboardType="url"
-          placeholder="http://10.0.2.2:4000"
+          placeholder={DEFAULT_API_BASE_URL}
           error={urlError}
         />
         <Text variant="caption" tone="muted" style={{ marginTop: -8 }}>

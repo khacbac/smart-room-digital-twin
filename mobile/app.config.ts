@@ -57,7 +57,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   experiments: { typedRoutes: true },
   extra: {
-    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.0.2.2:4000",
+    // Unset → the app follows the Metro host in dev (src/features/settings/_atoms/settings.ts).
+    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || undefined,
     deviceCode: process.env.EXPO_PUBLIC_DEVICE_CODE || "room-01",
   },
 });

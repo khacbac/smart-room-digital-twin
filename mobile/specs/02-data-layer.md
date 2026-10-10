@@ -137,7 +137,7 @@ automatic" bị khoá, nút buzzer vẫn bấm được. Nút còn bị khoá kh
 
 | Atom | Mặc định | Kiểm tra |
 |---|---|---|
-| `apiBaseUrlAtom` | `extra.apiBaseUrl` (`http://10.0.2.2:4000`) | `http(s)://host[:port]`, bỏ `/` cuối |
+| `apiBaseUrlAtom` | `extra.apiBaseUrl`, hoặc host của Metro `:4000` khi dev (fallback `http://10.0.2.2:4000`) | `http(s)://host[:port]`, bỏ `/` cuối |
 | `deviceCodeAtom` | `extra.deviceCode` (`room-01`) | regex `DeviceId` của contracts `^[a-z0-9-]{3,32}$` |
 | `themePreferenceAtom` | `"system"` | `system` / `light` / `dark` |
 | `voiceLocaleAtom` (M5) | `"vi-VN"` | `vi-VN` / `en-US` |

@@ -1,10 +1,45 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { DeviceId } from "@srdt/contracts";
 import { persistedAtom } from "@/lib/storage/mmkv";
 
 const extra = (Constants.expoConfig?.extra ?? {}) as { apiBaseUrl?: string; deviceCode?: string };
 
-export const DEFAULT_API_BASE_URL = extra.apiBaseUrl ?? "http://10.0.2.2:4000";
+const API_PORT = 4000;
+const EMULATOR_HOST = "10.0.2.2";
+
+// Android emulator images report a "generic"/"sdk_gphone"/"emulator" build fingerprint.
+function isAndroidEmulator(): boolean {
+  if (Platform.OS !== "android") return false;
+  const { Fingerprint = "", Model = "" } = Platform.constants as { Fingerprint?: string; Model?: string };
+  return /generic|emulator|sdk_gphone/i.test(Fingerprint) || /emulator|sdk_gphone|Android SDK built/i.test(Model);
+}
+
+// The host Metro serves the bundle from ("192.168.1.10:8081" → "192.168.1.10"). In dev the server runs on the
+// same machine, so this follows the laptop's current LAN IP on both the emulator and a real phone.
+function metroHost(): string | undefined {
+  const uri =
+    Constants.expoConfig?.hostUri ??
+    (Constants as { expoGoConfig?: { debuggerHost?: string } }).expoGoConfig?.debuggerHost;
+  return uri?.split(":")[0] || undefined;
+}
+
+/**
+ * Default backend URL until the user saves one in Settings:
+ *  - `EXPO_PUBLIC_API_BASE_URL` when set (a release build, or a shared backend);
+ *  - in dev, the Metro host on the server port. Loopback (Metro reached through `adb reverse`) becomes 10.0.2.2
+ *    on the emulator and stays 127.0.0.1 on a phone, which then needs `adb reverse tcp:4000 tcp:4000`;
+ *  - otherwise 10.0.2.2, the host machine seen from the emulator.
+ */
+function resolveDefaultApiBaseUrl(): string {
+  if (extra.apiBaseUrl) return extra.apiBaseUrl;
+  const host = __DEV__ ? metroHost() : undefined;
+  if (!host) return `http://${EMULATOR_HOST}:${API_PORT}`;
+  const loopback = host === "localhost" || host === "127.0.0.1";
+  return `http://${loopback && isAndroidEmulator() ? EMULATOR_HOST : host}:${API_PORT}`;
+}
+
+export const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl();
 export const DEFAULT_DEVICE_CODE = extra.deviceCode ?? "room-01";
 
 export const apiBaseUrlAtom = persistedAtom("apiBaseUrl", DEFAULT_API_BASE_URL);

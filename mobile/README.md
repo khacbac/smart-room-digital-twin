@@ -20,8 +20,11 @@ pnpm mobile:android
 Lần sau chỉ cần `pnpm mobile` (Metro) và mở app **Smart Room (Dev)** trên emulator; chỉ build lại khi thêm/đổi
 package native hoặc `app.config.ts`.
 
-Mặc định app gọi backend ở `http://10.0.2.2:4000` (`10.0.2.2` là máy host nhìn từ emulator). Đổi trong app:
-**Settings → Connection** (lưu trên máy), hoặc đặt mặc định bằng `mobile/.env` (xem `.env.example`).
+Khi chạy dev, app tự gọi backend ở máy đang chạy Metro (`http://<IP của Metro>:4000`), nên emulator và điện thoại
+cùng Wi-Fi đều tự kết nối, miễn server nghe `HOST=0.0.0.0` (`server/.env`). Nếu Metro đi qua `adb reverse`
+(`127.0.0.1`) thì emulator dùng `10.0.2.2`, còn điện thoại cần thêm `adb reverse tcp:4000 tcp:4000`. Đổi trong app:
+**Settings → Connection** (lưu trên máy, thắng mặc định), hoặc đặt cố định bằng `EXPO_PUBLIC_API_BASE_URL` trong
+`mobile/.env`.
 
 Cổng Metro 8081 bị chiếm (dự án khác đang chạy)? `pnpm mobile --port 8082`, rồi `adb reverse tcp:8082
 tcp:8082` và mở `exp+smart-room://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8082`.
@@ -30,7 +33,7 @@ tcp:8082` và mở `exp+smart-room://expo-development-client/?url=http%3A%2F%2F1
 
 | Cách nối | Backend URL trong Settings | Server |
 |---|---|---|
-| Cùng Wi-Fi | `http://<IP LAN của máy chạy server>:4000` | `HOST=0.0.0.0` trong `server/.env`, mở firewall cổng 4000 |
+| Cùng Wi-Fi | Tự động (IP của Metro), hoặc `http://<IP LAN>:4000` | `HOST=0.0.0.0` trong `server/.env`, mở firewall cổng 4000 |
 | Cáp USB | `http://127.0.0.1:4000` | `adb reverse tcp:4000 tcp:4000` |
 
 Nút **Test connection** trong Settings gọi `/health` và gợi ý cách sửa khi không kết nối được.

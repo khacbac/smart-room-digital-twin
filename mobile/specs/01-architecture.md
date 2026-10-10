@@ -208,7 +208,7 @@ Hệ quả cần nhớ:
 | `android.edgeToEdgeEnabled` | `true` (mặc định SDK 55) |
 | `android.permissions` | `INTERNET`; M5 thêm `RECORD_AUDIO` |
 | `plugins` | `expo-router`, `expo-font`, `expo-splash-screen` (nền `#f6f7f4`, dark `#19211d`), `expo-build-properties` (§7), M5: `expo-speech-recognition` (chuỗi xin quyền micro) |
-| `extra` | `apiBaseUrl`, `deviceCode` mặc định từ `EXPO_PUBLIC_API_BASE_URL` (mặc định `http://10.0.2.2:4000`), `EXPO_PUBLIC_DEVICE_CODE` (mặc định `room-01`) |
+| `extra` | `apiBaseUrl`, `deviceCode` mặc định từ `EXPO_PUBLIC_API_BASE_URL` (không đặt → dev dùng host của Metro `:4000`, xem `settings.ts`; fallback `http://10.0.2.2:4000`), `EXPO_PUBLIC_DEVICE_CODE` (mặc định `room-01`) |
 | `experiments.typedRoutes` | `true` |
 
 Icon: chữ house của dashboard (brand-mark), nền accent `#527562`, glyph trắng. Adaptive icon: foreground glyph,
