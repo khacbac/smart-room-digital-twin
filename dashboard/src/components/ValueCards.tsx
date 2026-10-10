@@ -1,44 +1,121 @@
+import {
+  Droplets,
+  Sun,
+  Thermometer,
+  UserRound,
+  Wind,
+  type LucideIcon,
+} from "lucide-react";
 import type { EdgeState, TelemetryRecord } from "@srdt/contracts";
-import { STATE_COLOR, fmt } from "@/lib/format";
-import { AQ_LINES, HUMIDITY_LINES, TEMP_LINES, levelFor } from "@/lib/thresholds";
+import { STATE_COLOR, STATE_LABEL, fmt } from "@/lib/format";
+import {
+  AQ_LINES,
+  HUMIDITY_LINES,
+  TEMP_LINES,
+  levelFor,
+} from "@/lib/thresholds";
 
-function Card(props: { label: string; value: string; unit?: string; level?: EdgeState | null; tag?: string }) {
+function Card(props: {
+  label: string;
+  value: string;
+  unit?: string;
+  level?: EdgeState | null;
+  note: string;
+  icon: LucideIcon;
+  tone: string;
+}) {
+  const Icon = props.icon;
   return (
-    <div className="card value-card">
-      <span className="value-label">{props.label}</span>
-      <span className="value" style={props.level ? { color: STATE_COLOR[props.level] } : undefined}>
+    <div className={`card value-card metric-${props.tone}`}>
+      <div className="metric-head">
+        <span className="value-label">{props.label}</span>
+        <span className="metric-icon">
+          <Icon size={19} aria-hidden="true" />
+        </span>
+      </div>
+      <span
+        className="value"
+        style={props.level ? { color: STATE_COLOR[props.level] } : undefined}
+      >
         {props.value}
-        {props.unit && props.value !== "—" && <span className="unit">{props.unit}</span>}
+        {props.unit && props.value !== "—" && (
+          <span className="unit">{props.unit}</span>
+        )}
       </span>
-      {props.tag && <span className="tag">{props.tag}</span>}
+      <span
+        className={`metric-note${props.level ? ` level-${props.level.toLowerCase()}` : ""}`}
+      >
+        <span className="metric-dot" aria-hidden="true" />
+        {props.level ? STATE_LABEL[props.level] : props.note}
+      </span>
     </div>
   );
 }
 
-export function ValueCards(props: { live: TelemetryRecord | null; dhtFault: boolean; dimmed: boolean }) {
+export function ValueCards(props: {
+  live: TelemetryRecord | null;
+  dhtFault: boolean;
+  dimmed: boolean;
+}) {
   const { live } = props;
-  if (!live) return <div className="card empty">Waiting for telemetry…</div>;
-  // null temperature/humidity: DHT fault, or no valid reading since boot (§5.3)
-  const dhtTag = props.dhtFault ? "Sensor fault" : "No reading yet";
+  const missing = props.dhtFault ? "Sensor fault" : "Waiting for reading";
   return (
-    <section className={`values${props.dimmed ? " dimmed" : ""}`} aria-label="Current values">
+    <section
+      className={`values${props.dimmed ? " dimmed" : ""}`}
+      aria-label="Current sensor readings"
+    >
       <Card
         label="Temperature"
-        value={fmt(live.temperature)}
+        value={fmt(live?.temperature)}
         unit="°C"
-        level={levelFor(live.temperature, TEMP_LINES)}
-        tag={live.temperature === null ? dhtTag : undefined}
+        icon={Thermometer}
+        tone="peach"
+        level={levelFor(live?.temperature ?? null, TEMP_LINES)}
+        note={live?.temperature == null ? missing : "Below heat threshold"}
       />
       <Card
         label="Humidity"
-        value={fmt(live.humidity, 0)}
+        value={fmt(live?.humidity, 0)}
         unit="%"
-        level={levelFor(live.humidity, HUMIDITY_LINES)}
-        tag={live.humidity === null ? dhtTag : undefined}
+        icon={Droplets}
+        tone="blue"
+        level={levelFor(live?.humidity ?? null, HUMIDITY_LINES)}
+        note={live?.humidity == null ? missing : "Below high threshold"}
       />
-      <Card label="Light" value={fmt(live.light, 0)} unit="lx" />
-      <Card label="Air quality" value={fmt(live.airQuality, 0)} unit="AQ" level={levelFor(live.airQuality, AQ_LINES)} />
-      <Card label="Presence" value={live.presence ? "Yes" : "No"} />
+      <Card
+        label="Light level"
+        value={fmt(live?.light, 0)}
+        unit="lx"
+        icon={Sun}
+        tone="sand"
+        note={live?.light == null ? "Waiting for reading" : "Ambient light"}
+      />
+      <Card
+        label="Air quality"
+        value={fmt(live?.airQuality, 0)}
+        unit="AQ"
+        icon={Wind}
+        tone="sage"
+        level={levelFor(live?.airQuality ?? null, AQ_LINES)}
+        note={
+          live?.airQuality == null
+            ? "Waiting for reading"
+            : "Below alert threshold"
+        }
+      />
+      <Card
+        label="Occupancy"
+        value={!live ? "—" : live.presence ? "Detected" : "Quiet"}
+        icon={UserRound}
+        tone="lilac"
+        note={
+          !live
+            ? "Waiting for reading"
+            : live.presence
+              ? "Motion detected"
+              : "No motion detected"
+        }
+      />
     </section>
   );
 }

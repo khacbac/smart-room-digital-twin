@@ -1,3 +1,4 @@
+import { Activity, CheckCheck, CircleAlert, Clock3 } from "lucide-react";
 import type { EventRecord } from "@srdt/contracts";
 import { clockTime } from "@/lib/format";
 
@@ -9,27 +10,56 @@ function detail(e: EventRecord): string {
   return e.message;
 }
 
+function eventLabel(type: string) {
+  const text = type.toLowerCase().replaceAll("_", " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function EventList({ events }: { events: EventRecord[] }) {
   return (
-    <section className="card" aria-label="Recent events">
+    <section className="card activity-card" aria-label="Recent room activity">
       <div className="card-head">
-        <h2>Recent events</h2>
+        <div>
+          <h2>Recent activity</h2>
+          <p className="section-description">The latest from your room.</p>
+        </div>
+        <Activity size={19} className="muted" aria-hidden="true" />
       </div>
       {events.length === 0 ? (
-        <p className="muted small">No events yet.</p>
+        <div className="activity-empty">
+          <CheckCheck size={25} aria-hidden="true" />
+          <strong>All quiet for now</strong>
+          <p>Room updates and alerts will appear here.</p>
+        </div>
       ) : (
         <ul className="list events">
           {events.map((e) => (
-            <li key={e.id} className="list-row">
-              <span className={`sev sev-${e.severity}`} title={e.severity} />
-              <span className="muted small mono" title={`device time ${clockTime(e.measuredAt)}`}>
-                {clockTime(e.createdAt)}
+            <li key={e.id} className="event-row">
+              <span className={`event-icon sev-${e.severity}`}>
+                {e.severity === "info" ? (
+                  <Activity size={15} aria-hidden="true" />
+                ) : (
+                  <CircleAlert size={15} aria-hidden="true" />
+                )}
               </span>
-              <span className="mono small">{e.type}</span>
-              <span className="small grow ellipsis" title={detail(e)}>
-                {detail(e)}
-              </span>
-              {e.source === "server" && <span className="tag">server</span>}
+              <div className="event-content">
+                <div className="event-title">
+                  <strong title={e.type}>{eventLabel(e.type)}</strong>
+                  <span
+                    className={`event-severity level-${e.severity === "critical" ? "danger" : e.severity}`}
+                  >
+                    {e.severity}
+                  </span>
+                </div>
+                <p>{detail(e)}</p>
+                <span
+                  className="event-time"
+                  title={`Device time ${clockTime(e.measuredAt)}`}
+                >
+                  <Clock3 size={11} aria-hidden="true" />
+                  {clockTime(e.createdAt)}
+                </span>
+              </div>
             </li>
           ))}
         </ul>
