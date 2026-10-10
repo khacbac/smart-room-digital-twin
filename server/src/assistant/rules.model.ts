@@ -1,6 +1,6 @@
 import { AQ_LINES, HUMIDITY_LINES, TEMP_LINES, levelFor } from "@srdt/twin-core";
 import type { AssistantLocale, EdgeState } from "@srdt/contracts";
-import type { AssistantModel, AssistantPlan, PlanInput, RoomContext } from "./model";
+import type { AssistantModel, AssistantPlan, AssistantPlanInput, PlanInput, RoomContext } from "./model";
 
 // Keyword planner that needs no network or API key: for tests, offline demos and as the
 // fallback when no LLM is configured. It understands the sentences of the spec's table
@@ -35,6 +35,10 @@ const BIT = /\b(he|mot chut|chut|a bit|slightly|a little|crack)\b/;
 const HOT = /\b(nong|ngot ngat|bi|hot|stuffy|warm)\b/;
 const QUERY = /\b(the nao|sao|bao nhieu|co ai|khong|nhu nao|how|what|why|is (there|anyone)|status|temperature|nhiet do|do am|humidity)\b/;
 const VAGUE = /\b(lam gi do|gi do|something|anything)\b/;
+const YES = /^(co|u|uh|um|ok|oke|okay|dong y|duoc|vang|da|yes|yeah|yep|sure|please|go ahead|do it)( (di|nhe|nha|lam di|please))?$/;
+
+const OFFER_VI = "Mình mở cửa sổ một nửa cho thoáng nhé?";
+const OFFER_EN = "Shall I open the window halfway to let air in?";
 
 const t = (locale: AssistantLocale, vi: string, en: string) => (locale === "vi-VN" ? vi : en);
 
@@ -85,18 +89,28 @@ function explain(room: RoomContext, locale: AssistantLocale): string {
 export class RulesModel implements AssistantModel {
   readonly name = "rules";
 
-  async plan({ text, locale, room }: PlanInput): Promise<AssistantPlan> {
+  async plan({ text, locale, room, history }: PlanInput): Promise<AssistantPlanInput> {
     const s = fold(text);
     const say = (vi: string, en: string) => t(locale, vi, en);
+
+    // "yes" to the window offer made for an unsupported device (below)
+    const last = history.at(-1);
+    if (has(s, YES) && last?.role === "assistant" && last.text.includes(say(OFFER_VI, OFFER_EN)) && room.online)
+      return {
+        intent: "command",
+        commands: [{ action: "OPEN_WINDOW", value: 45 }],
+        reply: say("Mình đang mở cửa sổ 45 độ. Chế độ tay giữ 2 phút.", "Opening the window to 45 degrees. Manual mode lasts 2 minutes."),
+      };
 
     if (has(s, UNSUPPORTED) && !has(s, WINDOW) && !has(s, BUZZER))
       return {
         intent: "unsupported",
         commands: [],
         reply: say(
-          "Phòng này chỉ có cửa sổ và còi báo động thôi, mình chưa điều khiển được thiết bị đó.",
-          "This room only has a window and an alarm, so I can't control that.",
+          `Phòng này chỉ có cửa sổ và còi báo động, chưa có thiết bị đó. ${OFFER_VI}`,
+          `This room only has a window and an alarm, not that device. ${OFFER_EN}`,
         ),
+        expectsAnswer: true,
       };
     if (!room.online && (has(s, WINDOW) || has(s, BUZZER) || has(s, AUTO)))
       return { intent: "command", commands: [], reply: say("Thiết bị đang offline.", "The device is offline.") };
@@ -178,7 +192,8 @@ export class RulesModel implements AssistantModel {
           "Bạn muốn mình mở hay đóng cửa sổ, tắt còi, hay xem tình trạng phòng?",
           "Would you like me to open or close the window, silence the alarm, or check the room?",
         ),
+        expectsAnswer: true,
       };
-    return { intent: "clarify", commands: [], reply: say("Bạn nói lại được không?", "Could you say that again?") };
+    return { intent: "clarify", commands: [], reply: say("Bạn nói lại được không?", "Could you say that again?"), expectsAnswer: true };
   }
 }

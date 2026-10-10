@@ -1,14 +1,16 @@
 import { readFileSync } from "node:fs";
 import type { AssistantLocale } from "@srdt/contracts";
 import { normalise } from "../src/assistant/assistant.service";
+import { AnthropicModel } from "../src/assistant/anthropic.model";
 import { GeminiModel } from "../src/assistant/gemini.model";
-import { AssistantPlan, type AssistantModel, type RoomContext } from "../src/assistant/model";
+import { AssistantPlan, DEFAULT_ASSISTANT_MODEL, type AssistantModel, type RoomContext } from "../src/assistant/model";
 import { RulesModel } from "../src/assistant/rules.model";
 
 // Runs the sentence table of mobile/specs/05-voice-assistant.md §6 through a real model and
 // prints how many plans match (action set, and angle within 5°). Target: ≥ 90 %.
 //
 //   GEMINI_API_KEY=… pnpm --filter @srdt/server assistant-eval            (gemini, ASSISTANT_MODEL)
+//   ASSISTANT_PROVIDER=anthropic ANTHROPIC_API_KEY=… pnpm --filter @srdt/server assistant-eval
 //   ASSISTANT_PROVIDER=rules pnpm --filter @srdt/server assistant-eval    (offline keyword model)
 
 interface Case {
@@ -45,13 +47,18 @@ try {
 const provider = process.env.ASSISTANT_PROVIDER ?? "gemini";
 let model: AssistantModel;
 if (provider === "rules") model = new RulesModel();
-else {
-  const key = process.env.GEMINI_API_KEY;
+else if (provider === "anthropic" || provider === "gemini") {
+  const keyName = provider === "anthropic" ? "ANTHROPIC_API_KEY" : "GEMINI_API_KEY";
+  const key = process.env[keyName];
   if (!key) {
-    console.error("GEMINI_API_KEY is not set (or use ASSISTANT_PROVIDER=rules)");
+    console.error(`${keyName} is not set (or use ASSISTANT_PROVIDER=rules)`);
     process.exit(1);
   }
-  model = new GeminiModel(key, process.env.ASSISTANT_MODEL ?? "gemini-3-flash-preview");
+  const name = process.env.ASSISTANT_MODEL || DEFAULT_ASSISTANT_MODEL[provider];
+  model = provider === "anthropic" ? new AnthropicModel(key, name) : new GeminiModel(key, name);
+} else {
+  console.error(`unknown ASSISTANT_PROVIDER=${provider}`);
+  process.exit(1);
 }
 
 const cases = readFileSync(new URL("./assistant-eval.jsonl", import.meta.url), "utf8")

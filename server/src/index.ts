@@ -1,7 +1,8 @@
 import { buildApi } from "./api/routes";
+import { AnthropicModel } from "./assistant/anthropic.model";
 import { AssistantService } from "./assistant/assistant.service";
 import { GeminiModel } from "./assistant/gemini.model";
-import type { AssistantModel } from "./assistant/model";
+import { DEFAULT_ASSISTANT_MODEL, type AssistantModel } from "./assistant/model";
 import { RulesModel } from "./assistant/rules.model";
 import { CommandService } from "./commands/command.service";
 import { loadConfig } from "./config/env";
@@ -80,9 +81,13 @@ async function main() {
   let model: AssistantModel | null = null;
   if (config.ASSISTANT_PROVIDER === "rules") model = new RulesModel();
   else if (config.ASSISTANT_PROVIDER === "gemini" && config.GEMINI_API_KEY)
-    model = new GeminiModel(config.GEMINI_API_KEY, config.ASSISTANT_MODEL);
-  else if (config.ASSISTANT_PROVIDER === "gemini")
-    log.warn("ASSISTANT_PROVIDER=gemini but GEMINI_API_KEY is empty: the assistant answers 503 (set ASSISTANT_PROVIDER=rules to try it offline)");
+    model = new GeminiModel(config.GEMINI_API_KEY, config.ASSISTANT_MODEL || DEFAULT_ASSISTANT_MODEL.gemini);
+  else if (config.ASSISTANT_PROVIDER === "anthropic" && config.ANTHROPIC_API_KEY)
+    model = new AnthropicModel(config.ANTHROPIC_API_KEY, config.ASSISTANT_MODEL || DEFAULT_ASSISTANT_MODEL.anthropic);
+  else if (config.ASSISTANT_PROVIDER !== "off") {
+    const key = config.ASSISTANT_PROVIDER === "gemini" ? "GEMINI_API_KEY" : "ANTHROPIC_API_KEY";
+    log.warn(`ASSISTANT_PROVIDER=${config.ASSISTANT_PROVIDER} but ${key} is empty: the assistant answers 503 (set ASSISTANT_PROVIDER=rules to try it offline)`);
+  }
   const assistant = new AssistantService(
     model,
     commands,

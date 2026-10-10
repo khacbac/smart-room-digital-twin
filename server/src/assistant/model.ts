@@ -17,8 +17,12 @@ export const AssistantPlan = z.object({
   intent: AssistantIntent,
   commands: z.array(z.object({ action: AssistantAction, value: z.number().nullable() })).max(2),
   reply: z.string().trim().min(1).max(400),
+  /** The reply asks the user something, so the app should listen for the answer. */
+  expectsAnswer: z.boolean().default(false),
 });
 export type AssistantPlan = z.infer<typeof AssistantPlan>;
+/** A plan before defaults (expectsAnswer may be left out). */
+export type AssistantPlanInput = z.input<typeof AssistantPlan>;
 
 /** A compact summary of the twin for the prompt (never the whole telemetry history). */
 export interface RoomContext {
@@ -50,3 +54,9 @@ export interface AssistantModel {
   /** Throws on a transport error; may return anything (the caller validates it). */
   plan(input: PlanInput, signal: AbortSignal): Promise<unknown>;
 }
+
+/** Model used when ASSISTANT_MODEL is empty. */
+export const DEFAULT_ASSISTANT_MODEL = {
+  gemini: "gemini-3-flash-preview",
+  anthropic: "claude-haiku-5-5",
+} as const;

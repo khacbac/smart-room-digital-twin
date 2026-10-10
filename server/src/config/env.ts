@@ -38,10 +38,12 @@ const Env = z.object({
   SNAPSHOT_TELEMETRY_MIN: positive.default(15),
 
   // Voice/text assistant (POST /api/devices/:code/assistant). `rules` needs no key and
-  // understands a fixed set of sentences; `off` answers 503.
-  ASSISTANT_PROVIDER: z.enum(["gemini", "rules", "off"]).default("gemini"),
+  // understands a fixed set of sentences; `off` answers 503. `gemini` and `anthropic` need their key.
+  ASSISTANT_PROVIDER: z.enum(["gemini", "anthropic", "rules", "off"]).default("gemini"),
   GEMINI_API_KEY: z.string().optional(),
-  ASSISTANT_MODEL: z.string().default("gemini-3-flash-preview"),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  /** Empty = the provider's default (DEFAULT_ASSISTANT_MODEL). */
+  ASSISTANT_MODEL: z.string().optional(),
   ASSISTANT_TIMEOUT_SEC: positive.default(10),
 }).superRefine((env, ctx) => {
   // Fail at boot rather than on the first write, once MQTT messages are already arriving.

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DeviceRecord, StreamMessage, TelemetryRecord } from "@srdt/contracts";
 import { pino } from "pino";
 import { AssistantError, AssistantService, normalise, toRoomContext } from "../src/assistant/assistant.service";
+import { AnthropicModel } from "../src/assistant/anthropic.model";
 import { GeminiModel } from "../src/assistant/gemini.model";
 import type { AssistantModel, PlanInput } from "../src/assistant/model";
 import { RulesModel, fold } from "../src/assistant/rules.model";
@@ -142,6 +143,25 @@ describe("AssistantService", () => {
     expect(mqtt.published).toHaveLength(0);
   });
 
+  it("asks for an answer after a question, a confirmation or an offer", async () => {
+    const clarify = setup(new ScriptedModel([{ intent: "clarify", commands: [], reply: "Mở hay đóng?" }]));
+    expect((await clarify.assistant.ask(device(), ask("làm gì đó đi"))).expectsAnswer).toBe(true);
+    const offer = setup(new ScriptedModel([{ intent: "unsupported", commands: [], reply: "Không có quạt. Mở cửa sổ nhé?", expectsAnswer: true }]));
+    expect((await offer.assistant.ask(device(), ask("bật quạt"))).expectsAnswer).toBe(true);
+    const buzzer = setup(new ScriptedModel([{ intent: "command", commands: [{ action: "BUZZER_ON", value: null }], reply: "Bật còi." }]));
+    expect((await buzzer.assistant.ask(device(), ask("bật còi"))).expectsAnswer).toBe(true);
+    const done = setup(new ScriptedModel([{ intent: "command", commands: [{ action: "OPEN_WINDOW", value: 45 }], reply: "Mở 45 độ." }]));
+    expect((await done.assistant.ask(device(), ask("mở một nửa"))).expectsAnswer).toBe(false);
+  });
+
+  it("does not claim an action when every command was a no-op", async () => {
+    const { assistant, mqtt } = setup(new ScriptedModel([{ intent: "command", commands: [{ action: "CLOSE_WINDOW", value: null }], reply: "Đang đóng cửa sổ." }]));
+    const res = await assistant.ask(device(), ask("đóng cửa sổ"));
+    expect(res.commands).toEqual([]);
+    expect(res.reply).toMatch(/đúng như vậy rồi/);
+    expect(mqtt.published).toHaveLength(0);
+  });
+
   it("reports an offline device without sending anything to MQTT", async () => {
     const { assistant, mqtt } = setup(new ScriptedModel([{ intent: "command", commands: [{ action: "OPEN_WINDOW", value: 90 }], reply: "Mở." }]));
     const res = await assistant.ask(device({ presence: "offline" }), ask("mở cửa sổ"));
@@ -264,6 +284,13 @@ describe("RulesModel", () => {
     expect((await plan("Làm gì đó đi")).intent).toBe("clarify");
     expect((await plan("Nóng quá")).commands).toEqual([{ action: "OPEN_WINDOW", value: 90 }]);
   });
+
+  it("offers the window for a missing device and acts on yes", async () => {
+    const offer = await plan("Bật quạt lên");
+    expect(offer).toMatchObject({ intent: "unsupported", commands: [], expectsAnswer: true });
+    const yes = await rules.plan({ text: "Ừ", locale: "vi-VN", history: [{ role: "user", text: "Bật quạt lên" }, { role: "assistant", text: offer.reply }], room: room() });
+    expect(yes.commands).toEqual([{ action: "OPEN_WINDOW", value: 45 }]);
+  });
 });
 
 describe("GeminiModel", () => {
@@ -288,5 +315,32 @@ describe("GeminiModel", () => {
     await expect(
       model.plan({ text: "a", locale: "en-US", history: [], room: toRoomContext(device(), telemetry, NOW) }, new AbortController().signal),
     ).rejects.toThrow(/429/);
+  });
+});
+
+describe("AnthropicModel", () => {
+  it("forces the plan tool and returns its input", async () => {
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      expect(body.tool_choice).toEqual({ type: "tool", name: "room_plan" });
+      expect(body.messages.at(-1).content).toContain("USER SAID: mở cửa");
+      expect((init.headers as Record<string, string>)["x-api-key"]).toBe("key");
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "tool_use", id: "t1", name: "room_plan", input: { intent: "command", commands: [], reply: "ok" } }],
+        }),
+      );
+    });
+    const model = new AnthropicModel("key", "claude-haiku-5-5", fetchFn as unknown as typeof fetch);
+    const out = await model.plan({ text: "mở cửa", locale: "vi-VN", history: [], room: toRoomContext(device(), telemetry, NOW) }, new AbortController().signal);
+    expect(out).toEqual({ intent: "command", commands: [], reply: "ok" });
+  });
+
+  it("throws on an HTTP error", async () => {
+    const fetchFn = async () => new Response("overloaded", { status: 529 });
+    const model = new AnthropicModel("key", "m", fetchFn as unknown as typeof fetch);
+    await expect(
+      model.plan({ text: "a", locale: "en-US", history: [], room: toRoomContext(device(), telemetry, NOW) }, new AbortController().signal),
+    ).rejects.toThrow(/529/);
   });
 });

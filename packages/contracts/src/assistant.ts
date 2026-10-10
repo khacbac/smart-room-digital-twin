@@ -43,4 +43,6 @@ export interface AssistantResponse {
   commands: AssistantCommandResult[];
   /** Commands the model proposed that need the user's OK first (BUZZER_ON). */
   pendingConfirmation: { action: CommandAction; value: number | null }[];
+  /** The reply ends with a question (clarify, an offer, a confirmation): the app listens again after speaking it. */
+  expectsAnswer: boolean;
 }

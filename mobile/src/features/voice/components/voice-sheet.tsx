@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
-import * as Speech from "expo-speech";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Keyboard, Mic, Send, Sparkles, Volume2, X } from "lucide-react-native";
+import { CircleCheck, Keyboard, Mic, Send, Sparkles, Volume2, X } from "lucide-react-native";
+import { isOpenStatus } from "@srdt/twin-core";
 import Animated, { FadeIn, FadeInDown, SlideInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "@/components/button";
@@ -11,7 +11,18 @@ import { fontFamily } from "@/lib/theme/colors";
 import { useTheme } from "@/lib/theme/theme";
 import { voiceLocaleAtom, voiceSpeakRepliesAtom } from "@/features/settings/_atoms/settings";
 import { sendCommandAtom } from "@/features/controls/_atoms/mutations";
-import { askAssistantAtom, clearVoiceSessionAtom, voiceTurnsAtom, type VoiceTurn } from "@/features/voice/_atoms/session";
+import {
+  addLocalTurnAtom,
+  addTurnCommandAtom,
+  askAssistantAtom,
+  clearVoiceSessionAtom,
+  patchTurnAtom,
+  voiceTurnsAtom,
+  type VoiceTurn,
+} from "@/features/voice/_atoms/session";
+import { commandsAtom } from "@/features/twin/_atoms/state";
+import { BUZZER_CANCELLED, BUZZER_CONFIRMED, reportText, speechErrorText, yesNo, type FinishedCommand } from "@/features/voice/phrases";
+import { useVoiceOut } from "@/features/voice/use-voice-out";
 import { CommandResult } from "@/features/voice/components/command-result";
 import { Waveform } from "@/features/voice/components/waveform";
 import { useSpeech, type SpeechError } from "@/features/voice/use-speech";
@@ -21,6 +32,9 @@ const SUGGESTIONS = {
   "vi-VN": ["Mở cửa sổ một nửa", "Phòng đang thế nào?", "Tắt còi đi"],
   "en-US": ["Open the window halfway", "How is the room?", "Silence the alarm"],
 };
+
+/** No word from the device by then (the server times commands out after 10 s): say so anyway. */
+const REPORT_GIVE_UP_MS = 20_000;
 
 const SPEECH_ERROR: Record<SpeechError, string> = {
   permission: "Microphone access is off. Allow it in Settings, or type instead.",
@@ -41,44 +55,111 @@ export function VoiceSheet({ onClose: close }: { onClose: () => void }) {
   const [locale, setLocale] = useAtom(voiceLocaleAtom);
   const speak = useAtomValue(voiceSpeakRepliesAtom);
   const turns = useAtomValue(voiceTurnsAtom);
+  const commands = useAtomValue(commandsAtom);
   const ask = useSetAtom(askAssistantAtom);
+  const addLocalTurn = useSetAtom(addLocalTurnAtom);
+  const addTurnCommand = useSetAtom(addTurnCommandAtom);
+  const patchTurn = useSetAtom(patchTurnAtom);
+  const send = useSetAtom(sendCommandAtom);
   const clear = useSetAtom(clearVoiceSessionAtom);
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState("");
-  const [speaking, setSpeaking] = useState(false);
   const scroll = useRef<ScrollView>(null);
   const busy = turns.some((t) => !t.response && !t.error);
+  const voice = useVoiceOut(speak, locale);
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
+  const typingRef = useRef(typing);
+  typingRef.current = typing;
+
+  /** Sends the alarm the user agreed to; the report follows on `target`'s commands. */
+  const confirmBuzzer = useCallback(
+    async (pending: VoiceTurn, answer: "yes" | "no", target: VoiceTurn = pending) => {
+      patchTurn(pending.id, { confirmation: answer });
+      if (answer === "no") return;
+      const commandId = await send({ action: "BUZZER_ON", source: "ai" });
+      if (commandId) addTurnCommand(target.id, { action: "BUZZER_ON", value: null, commandId, status: "sent", error: null });
+    },
+    [patchTurn, send, addTurnCommand],
+  );
 
   const submit = useCallback(
     async (text: string) => {
-      Speech.stop();
-      const turn = await ask(text);
-      if (speak && turn.response) {
-        setSpeaking(true);
-        Speech.speak(turn.response.reply, {
-          language: locale,
-          onDone: () => setSpeaking(false),
-          onStopped: () => setSpeaking(false),
-          onError: () => setSpeaking(false),
-        });
+      voice.stop();
+      // a spoken answer to "do you really want the alarm?" is handled here, not by the model
+      const last = turnsRef.current.at(-1);
+      if (last?.response?.pendingConfirmation.length && last.confirmation === null) {
+        const answer = yesNo(text);
+        if (answer) {
+          const turn = addLocalTurn(text, (answer === "yes" ? BUZZER_CONFIRMED : BUZZER_CANCELLED)[locale]);
+          voice.say(turn.response!.reply);
+          await confirmBuzzer(last, answer, turn);
+          return;
+        }
       }
+      const turn = await ask(text);
+      if (turn.error) voice.say(turn.error);
+      else if (turn.response)
+        // a question gets an answer: listen again once it has been said (not while typing)
+        voice.say(turn.response.reply, turn.response.expectsAnswer ? () => !typingRef.current && listenRef.current(true) : undefined);
     },
-    [ask, speak, locale],
+    [ask, addLocalTurn, confirmBuzzer, locale, voice],
   );
 
   const speech = useSpeech((text) => void submit(text));
 
-  const listen = () => {
-    Speech.stop();
+  /** `auto`: after the assistant asked something; keeps anything still queued to say. */
+  const listen = (auto = false) => {
+    if (!auto) voice.stop();
     setTyping(false);
     void speech.start(locale);
   };
+  const listenRef = useRef(listen);
+  listenRef.current = listen;
+
+  // say recognition errors too, so a failed attempt never ends in silence
+  useEffect(() => {
+    const text = speech.error && speechErrorText(locale, speech.error);
+    if (text) voice.say(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speech.error]);
+
+  // once every command of a turn has a final status, say how it went
+  const [tick, setTick] = useState(0);
+  const firstSeen = useRef(new Map<string, number>());
+  useEffect(() => {
+    let wake = Infinity;
+    for (const t of turns) {
+      const sent = t.response?.commands.filter((c) => c.commandId && !c.error) ?? [];
+      if (!t.response || t.report !== null || sent.length === 0) continue;
+      const key = `${t.id}:${sent.map((c) => c.commandId).join(",")}`;
+      const since = firstSeen.current.get(key) ?? Date.now();
+      firstSeen.current.set(key, since);
+      const givenUp = Date.now() - since >= REPORT_GIVE_UP_MS;
+      const finished: FinishedCommand[] = [];
+      for (const c of sent) {
+        const status = commands.find((r) => r.id === c.commandId)?.status ?? c.status ?? "pending";
+        if (!isOpenStatus(status)) finished.push({ action: c.action, value: c.value, status });
+        else if (givenUp) finished.push({ action: c.action, value: c.value, status: "lost" });
+      }
+      if (finished.length < sent.length) {
+        wake = Math.min(wake, since + REPORT_GIVE_UP_MS - Date.now());
+        continue;
+      }
+      const report = reportText(locale, finished);
+      patchTurn(t.id, { report });
+      voice.say(report);
+    }
+    if (wake === Infinity) return;
+    const timer = setTimeout(() => setTick((n) => n + 1), Math.max(0, wake) + 50);
+    return () => clearTimeout(timer);
+  }, [turns, commands, tick, locale, patchTurn, voice]);
 
   // open → start listening right away; close → stop everything and forget the session
   useEffect(() => {
     listen();
     return () => {
-      Speech.stop();
+      voice.stop();
       speech.abort();
       clear();
     };
@@ -158,7 +239,15 @@ export function VoiceSheet({ onClose: close }: { onClose: () => void }) {
               </View>
             )}
             {turns.map((t, i) => (
-              <Turn key={t.id} turn={t} last={i === turns.length - 1} speaking={speaking} onStopSpeaking={() => Speech.stop()} onRetry={() => void submit(t.text)} />
+              <Turn
+                key={t.id}
+                turn={t}
+                last={i === turns.length - 1}
+                speaking={voice.speaking}
+                onStopSpeaking={voice.stop}
+                onRetry={() => void submit(t.text)}
+                onConfirm={(answer) => void confirmBuzzer(t, answer)}
+              />
             ))}
             {speech.listening && (speech.transcript || speech.interim) ? (
               <Animated.View entering={FadeIn} style={{ alignSelf: "flex-end", maxWidth: "85%" }}>
@@ -216,7 +305,7 @@ export function VoiceSheet({ onClose: close }: { onClose: () => void }) {
               >
                 <Send size={20} color={colors["accent-text"]} />
               </RoundButton>
-              <RoundButton label="Speak instead" quiet onPress={listen}>
+              <RoundButton label="Speak instead" quiet onPress={() => listen()}>
                 <Mic size={20} color={colors.text} />
               </RoundButton>
             </View>
@@ -255,7 +344,7 @@ export function VoiceSheet({ onClose: close }: { onClose: () => void }) {
               </View>
               {/* fixed width: Android keeps the first measured width when the label changes */}
               <Text variant="caption" tone="muted" style={{ width: 240, textAlign: "center" }}>
-                {speech.listening ? "Listening… tap to stop" : busy ? "Thinking…" : turns.length ? "Ask again" : "Tap to talk"}
+                {speech.listening ? "Listening… tap to stop" : busy ? "Thinking…" : voice.speaking ? "Speaking… tap to interrupt" : turns.length ? "Ask again" : "Tap to talk"}
               </Text>
             </View>
           )}
@@ -288,10 +377,15 @@ function RoundButton(props: { label: string; onPress: () => void; disabled?: boo
   );
 }
 
-function Turn(props: { turn: VoiceTurn; last: boolean; speaking: boolean; onStopSpeaking: () => void; onRetry: () => void }) {
+function Turn(props: {
+  turn: VoiceTurn;
+  last: boolean;
+  speaking: boolean;
+  onStopSpeaking: () => void;
+  onRetry: () => void;
+  onConfirm: (answer: "yes" | "no") => void;
+}) {
   const { colors } = useTheme();
-  const send = useSetAtom(sendCommandAtom);
-  const [confirmed, setConfirmed] = useState<"yes" | "no" | null>(null);
   const { turn } = props;
   const res = turn.response;
   return (
@@ -331,10 +425,21 @@ function Turn(props: { turn: VoiceTurn; last: boolean; speaking: boolean; onStop
           {res.commands.map((c, i) => (
             <CommandResult key={c.commandId ?? `${c.action}-${i}`} result={c} />
           ))}
-          {res.pendingConfirmation.length > 0 && confirmed === null && (
+          {turn.report && (
+            <Animated.View
+              entering={FadeInDown.duration(220)}
+              style={{ alignSelf: "flex-start", maxWidth: "90%", flexDirection: "row", gap: 8, padding: 12, borderRadius: 18, borderBottomLeftRadius: 6, backgroundColor: colors["surface-2"] }}
+            >
+              <CircleCheck size={16} color={colors.accent} />
+              <Text variant="body" style={{ flexShrink: 1 }}>
+                {turn.report}
+              </Text>
+            </Animated.View>
+          )}
+          {res.pendingConfirmation.length > 0 && turn.confirmation === null && (
             <View style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors["danger-line"], backgroundColor: colors["danger-tint"], gap: 10 }}>
               <Text variant="label" tone="state-danger">
-                The alarm will sound in the room.
+                The alarm will sound in the room. Say “yes” or “no”, or tap.
               </Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 <Button
@@ -342,12 +447,9 @@ function Turn(props: { turn: VoiceTurn; last: boolean; speaking: boolean; onStop
                   compact
                   label="Turn on alarm"
                   variant="danger"
-                  onPress={() => {
-                    setConfirmed("yes");
-                    void send({ action: "BUZZER_ON", source: "ai" });
-                  }}
+                  onPress={() => props.onConfirm("yes")}
                 />
-                <Button flex compact label="Cancel" variant="outline" onPress={() => setConfirmed("no")} />
+                <Button flex compact label="Cancel" variant="outline" onPress={() => props.onConfirm("no")} />
               </View>
             </View>
           )}

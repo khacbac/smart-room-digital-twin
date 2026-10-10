@@ -37,12 +37,15 @@ Nút **Test connection** trong Settings gọi `/health` và gợi ý cách sửa
 
 ## Voice
 
-Nút mic giữa tab bar → nói (hoặc gõ) → server hiểu ý và gửi lệnh với `source: "ai"` → app đọc câu trả lời và theo
-dõi lệnh live. Server cần một provider (`server/.env`):
+Nút mic giữa tab bar → nói (hoặc gõ) → LLM ở server đoán ý từ câu nói + số liệu phòng ("đi ngủ" → đóng cửa, "nóng
+quá" → mở cửa) và gửi lệnh với `source: "ai"` → app đọc câu trả lời, theo dõi lệnh live rồi **nói lại kết quả** khi
+thiết bị xác nhận. Việc phòng không làm được (bật đèn, quạt…) thì trợ lý đề nghị việc gần nhất và tự bật mic nghe
+"có/không". Server cần một provider (`server/.env`):
 
 | `ASSISTANT_PROVIDER` | Cần | Hiểu được |
 |---|---|---|
 | `gemini` (mặc định) | `GEMINI_API_KEY` | Câu tự do tiếng Việt/Anh, hỏi về phòng, giải thích trạng thái |
+| `anthropic` | `ANTHROPIC_API_KEY` (model mặc định `claude-haiku-5-5`) | Như `gemini`; eval 24/24 |
 | `rules` | không | Các câu mẫu trong `specs/05-voice-assistant.md` §6 (demo offline, test) |
 
 Kiểm chất lượng: `pnpm --filter @srdt/server assistant-eval` (mục tiêu ≥ 90 % đúng lệnh).
@@ -77,5 +80,8 @@ Logic dùng chung với dashboard (ngưỡng, nhãn, reducer twin, luật xung �
 - `Pressable` với `style={({ pressed }) => …}` mất style dưới NativeWind: dùng `components/touchable.tsx`.
 - `react-native-sse` không báo gì khi server đóng stream bình thường (server restart): `lib/datasource/rn-sse.ts`
   tự bắt và kết nối lại, kèm watchdog 60 s.
+- Giọng đọc offline mặc định của Google TTS (`…-seanet-embedded`) hay không phát ra tiếng trên emulator nhưng vẫn báo
+  "đọc xong", nên `features/voice/use-voice-out.ts` chọn sẵn giọng `…-network` của ngôn ngữ (mất mạng thì Google tự
+  dùng giọng offline).
 - `expo-speech-recognition` ghim bản `3.1.3` (dist-tag `sdk-55`); bản 57.x cần SDK 57.
 - Lần mở đầu tiên sau khi cài APK debug có thể báo "isn't responding" vài giây (ART đang verify), mở lại là ổn.

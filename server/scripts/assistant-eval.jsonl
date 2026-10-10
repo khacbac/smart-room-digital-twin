@@ -18,3 +18,7 @@
 {"text":"Nóng quá","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":90}]}
 {"text":"Bật điều hoà","locale":"vi-VN","intent":"unsupported","commands":[]}
 {"text":"Làm gì đó đi","locale":"vi-VN","intent":"clarify","commands":[]}
+{"text":"Mình chuẩn bị đi ngủ đây","locale":"vi-VN","room":{"windowAngle":45},"intent":"command","commands":[{"action":"CLOSE_WINDOW","value":null}]}
+{"text":"Trong phòng có mùi khét quá","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":90}]}
+{"text":"Bật quạt lên giúp mình","locale":"vi-VN","intent":"unsupported","commands":[]}
+{"text":"Ồn quá, im đi","locale":"vi-VN","room":{"buzzer":true},"intent":"command","commands":[{"action":"BUZZER_OFF","value":null}]}

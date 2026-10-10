@@ -72,7 +72,8 @@ export class AssistantService {
     const results: AssistantCommandResult[] = [];
     let failure: "offline" | "rateLimited" | "broker" | null = null;
 
-    for (const cmd of normalise(plan.commands, room)) {
+    const planned = normalise(plan.commands, room);
+    for (const cmd of planned) {
       if (cmd.action === "BUZZER_ON") {
         // it makes a real sound in the room: the app asks, then sends it itself
         pendingConfirmation.push(cmd);
@@ -97,14 +98,19 @@ export class AssistantService {
     }
 
     let text = plan.reply;
-    if (failure) text = reply(req.locale, failure);
-    else if (pendingConfirmation.length > 0 && results.length === 0) text = reply(req.locale, "confirmBuzzer");
+    let expectsAnswer = plan.expectsAnswer || plan.intent === "clarify" || pendingConfirmation.length > 0;
+    if (failure) {
+      text = reply(req.locale, failure);
+      expectsAnswer = false;
+    } else if (pendingConfirmation.length > 0 && results.length === 0) text = reply(req.locale, "confirmBuzzer");
+    // the model said it would do something that the room already is: don't claim an action
+    else if (plan.commands.length > 0 && planned.length === 0) text = reply(req.locale, "alreadyDone");
 
     log.info(
       { text: req.text, intent: plan.intent, actions: plan.commands.map((c) => c.action), ms: this.now() - started },
       "assistant answered",
     );
-    return { intent: plan.intent, reply: text, commands: results, pendingConfirmation };
+    return { intent: plan.intent, reply: text, commands: results, pendingConfirmation, expectsAnswer };
   }
 
   /** Model output that is not a valid plan gets one more try, then 502. */

@@ -79,6 +79,8 @@ export interface AssistantResponse {
   commands: AssistantCommandResult[];
   /** Commands the model proposed but that need the user's OK first (BUZZER_ON). */
   pendingConfirmation: { action: CommandAction; value: number | null }[];
+  /** The reply ends with a question (clarify, an offer, a confirmation): the app listens again after speaking it. */
+  expectsAnswer: boolean;
 }
 ```
 
@@ -132,23 +134,31 @@ twin-core) để LLM giải thích được "vì sao Warning".
 
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
-| `ASSISTANT_PROVIDER` | `gemini` | `gemini` / `rules` / `off` |
+| `ASSISTANT_PROVIDER` | `gemini` | `gemini` / `anthropic` / `rules` / `off` |
 | `GEMINI_API_KEY` | (trống) | Thiếu key mà provider `gemini` → endpoint trả `503` |
-| `ASSISTANT_MODEL` | bản Gemini **Flash** mới nhất lúc làm M5 | Cần nhanh (< 2 s), không cần bản Pro như lúc gán nhãn dữ liệu ML |
+| `ANTHROPIC_API_KEY` | (trống) | Như trên, cho provider `anthropic` (Claude, tool call bắt buộc thay cho responseSchema) |
+| `ASSISTANT_MODEL` | trống = mặc định của provider (`gemini-3-flash-preview` / `claude-haiku-5-5`) | Cần nhanh (< 2 s), không cần bản Pro như lúc gán nhãn dữ liệu ML |
 | `ASSISTANT_TIMEOUT_SEC` | `10` | |
 
 ### 3.3 Prompt (nội dung chính, viết ở `prompt.ts`)
 
-- Vai trò: trợ lý của một phòng thông minh, chỉ điều khiển được **cửa sổ** (góc 1–90°, đóng) và **còi báo động**
-  (bật/tắt), và **trả lại chế độ tự động**. Không có đèn, điều hoà, quạt; được hỏi thì nói rõ là không có
-  (`unsupported`).
+- Vai trò: trợ lý của một phòng thông minh. Nghe lời người dùng, đoán ý từ câu nói + số liệu phòng, tự quyết định,
+  làm, rồi trả lời. Chỉ điều khiển được **cửa sổ** (góc 1–90°, đóng), **còi báo động** (bật/tắt) và **trả lại chế
+  độ tự động**.
+- Đoán ngữ cảnh: "nóng / bí / có mùi / đang nấu ăn" → mở cửa; "lạnh / mưa / đi ngủ / ra ngoài" → đóng cửa; "ồn quá"
+  khi còi kêu → tắt còi; "như cũ / tự động" → `CLEAR_OVERRIDE`. Khi tự suy ra thì nói ngắn lý do.
+- Không bao giờ chỉ nói "không làm được". Thiết bị không có (đèn, quạt, điều hoà, nhạc…) → `unsupported`, không gửi
+  lệnh, nói phòng không có thiết bị đó rồi **đề nghị** việc gần nhất làm được (nóng → mở cửa sổ; lạnh → đóng cửa;
+  đèn → báo độ sáng) dưới dạng câu hỏi có/không, `expectsAnswer: true`. Lượt sau người dùng đồng ý → làm việc đã đề nghị.
 - Action hợp lệ và ý nghĩa: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`.
   Không dùng `PING`.
 - Quy đổi lời nói ra góc: "hé / một chút / a bit" = 25; "một nửa / half" = 45; "mở / mở hết / fully" = 90; "thêm
   chút nữa / a bit more" = góc hiện tại + 20 (tối đa 90); "khép bớt" = góc hiện tại − 20 (≤ 0 thì `CLOSE_WINDOW`).
 - Lệnh tay giữ 2 phút rồi thiết bị tự quay về tự động; nói cho người dùng biết khi họ ra lệnh.
 - Câu hỏi về phòng → `query`, trả lời bằng số liệu trong `RoomContext`, ngắn (≤ 2 câu), có đơn vị.
-- Mơ hồ ("làm gì đó đi") → `clarify` + một câu hỏi lại.
+- Mơ hồ ("làm gì đó đi") → `clarify` + một câu hỏi lại kèm lựa chọn cụ thể, `expectsAnswer: true`.
+- `expectsAnswer` chỉ `true` khi reply kết thúc bằng câu hỏi; server cũng đặt `true` cho `clarify` và
+  `pendingConfirmation`, `false` khi lệnh lỗi.
 - Trả lời đúng ngôn ngữ `locale`, giọng thân thiện, ngắn vì sẽ được đọc to. Không dùng markdown, emoji.
 - `reply` viết như thể lệnh **đang được thực hiện** ("Mình đang mở cửa sổ 45 độ."), vì ack về sau.
 - Thiết bị offline → không đề xuất lệnh, `reply` báo thiết bị đang offline.
@@ -160,7 +170,8 @@ twin-core) để LLM giải thích được "vì sao Warning".
    - Bỏ lệnh không có trong 5 action hợp lệ.
    - `OPEN_WINDOW`: làm tròn, kẹp `value` vào 1–90; thiếu value thì 90.
    - Bỏ lệnh trùng hoặc vô nghĩa (đóng cửa khi cửa đang 0°, tắt còi khi còi đang tắt). Lệnh bị bỏ không xuất hiện
-     trong kết quả; `reply` của model vẫn đúng ("cửa sổ đã đóng sẵn rồi").
+     trong kết quả. Nếu model đề xuất lệnh mà bị bỏ hết, `reply` đổi thành câu mẫu `alreadyDone` ("Phòng đang đúng
+     như vậy rồi…") để không nói là đang làm.
    - `BUZZER_ON` **không gửi**, đưa vào `pendingConfirmation`; reply = "Bạn có chắc muốn bật còi báo động không?".
    - Còn lại → `CommandService.create(device, { action, value, source: "ai" })`, map `CreateResult` sang
      `AssistantCommandResult` (`device_offline` → `error: "DEVICE_OFFLINE"`…).
@@ -192,7 +203,10 @@ qua model thật, in tỉ lệ đúng action + value. Mục tiêu **≥ 90%** đ
 | Quyền | `RECORD_AUDIO`, xin lần đầu chạm mic. Bị từ chối vĩnh viễn → sheet hướng dẫn + nút mở cài đặt hệ thống |
 | Ngôn ngữ | `voiceLocaleAtom` (mặc định `vi-VN`). Android dùng dịch vụ nhận diện của Google: tiếng Việt cần mạng; kiểm `getSupportedLocales()` lúc mở sheet, không hỗ trợ thì gợi ý chuyển English |
 | Tự dừng | Hết giọng nói ~1.5 s thì Android tự kết thúc; thêm giới hạn cứng 15 s |
-| TTS | `expo-speech` `speak(reply, { language: locale, rate: 1.0 })` nếu `voiceSpeakRepliesAtom`. Dừng đọc khi người dùng chạm mic lại hoặc đóng sheet |
+| TTS | `use-voice-out.ts`: hàng đợi riêng trên `expo-speech` (`language: locale`) nếu `voiceSpeakRepliesAtom`. Đọc reply, rồi **báo cáo** khi lệnh xong, cả lỗi API và lỗi nhận giọng nói (không lượt nào kết thúc im lặng). Dừng khi chạm mic lại, chạm bong bóng đang đọc hoặc đóng sheet |
+| Báo cáo | Khi mọi lệnh của một lượt có status cuối (theo `commandsAtom`), app nói và hiện một bong bóng (`phrases.ts`): "Xong rồi, cửa sổ đã mở 45 độ." / "Thiết bị từ chối…" / "Thiết bị chưa xác nhận…". Quá 20 s không có status cuối (mất SSE) thì vẫn báo |
+| Hỏi lại | `expectsAnswer` → đọc xong reply thì tự bật mic nghe câu trả lời (trừ khi đang gõ) |
+| Xác nhận còi | Đang chờ xác nhận `BUZZER_ON` mà người dùng nói "có / ừ / ok / yes" → app tự gửi lệnh; "không / thôi / no" → huỷ; câu khác thì chuyển cho LLM như thường. Vẫn có nút bấm |
 | Gõ thay nói | Ô nhập chữ trong sheet (icon bàn phím): tiện trên emulator và khi ở chỗ đông người |
 | Mutation | `askAssistantAtom` (`features/voice/_atoms/mutations.ts`) theo cùng khuôn với `sendCommandAtom`: không throw, map lỗi API ra text |
 | Phiên | `voiceSessionAtom`: tối đa 3 lượt gần nhất (6 `AssistantTurn`), xoá khi đóng sheet |
@@ -234,8 +248,12 @@ Lịch sử các lượt trong phiên hiện như chat (cuộn), lượt mới n
 | "Sao lại báo Warning?" | query | — (giải thích theo ngưỡng vượt) |
 | "Trong phòng có ai không?" | query | — |
 | "Nóng quá" (31 °C, cửa đóng) | command | `OPEN_WINDOW 90` + reply giải thích |
-| "Bật điều hoà" | unsupported | — |
+| "Bật điều hoà" | unsupported | — (đề nghị mở cửa sổ, `expectsAnswer`) |
 | "Làm gì đó đi" | clarify | — |
+| (cửa đang 45°) "Mình chuẩn bị đi ngủ đây" | command | `CLOSE_WINDOW` |
+| "Trong phòng có mùi khét quá" | command | `OPEN_WINDOW 90` |
+| "Bật quạt lên giúp mình" | unsupported | — (đề nghị mở cửa sổ) |
+| (còi đang kêu) "Ồn quá, im đi" | command | `BUZZER_OFF` |
 
 ## 7. Bảo mật và riêng tư
 
