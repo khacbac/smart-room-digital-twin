@@ -7,6 +7,6 @@ export default defineConfig({
   target: "node24",
   clean: true,
   sourcemap: true,
-  // @srdt/contracts ships TypeScript source; bundle it instead of importing the .ts at runtime (it has no build step).
-  noExternal: ["@srdt/contracts"],
+  // the shared packages ship TypeScript source; bundle them instead of importing the .ts at runtime (no build step).
+  noExternal: ["@srdt/contracts", "@srdt/twin-core"],
 });

@@ -10,11 +10,13 @@
     "test": "vitest run",
     "test:firestore": "firebase emulators:exec --project srdt-contract-test --config ../cloud/firebase/firebase.json --only firestore 'vitest run'",
     "typecheck": "tsc -p tsconfig.json",
-    "fake-device": "tsx scripts/fake-device.ts"
+    "fake-device": "tsx scripts/fake-device.ts",
+    "assistant-eval": "tsx scripts/assistant-eval.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
     "@srdt/contracts": "workspace:*",
+    "@srdt/twin-core": "workspace:*",
     "fastify": "^5.12.5",
     "firebase-admin": "^14.5.0",
     "mqtt": "^5.16.0",

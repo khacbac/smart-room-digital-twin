@@ -1,4 +1,8 @@
 import { buildApi } from "./api/routes";
+import { AssistantService } from "./assistant/assistant.service";
+import { GeminiModel } from "./assistant/gemini.model";
+import type { AssistantModel } from "./assistant/model";
+import { RulesModel } from "./assistant/rules.model";
 import { CommandService } from "./commands/command.service";
 import { loadConfig } from "./config/env";
 import { DeviceService } from "./devices/device.service";
@@ -72,12 +76,27 @@ async function main() {
   );
 
   const stopRules = startServerRules({ devices, commands }, log);
+
+  let model: AssistantModel | null = null;
+  if (config.ASSISTANT_PROVIDER === "rules") model = new RulesModel();
+  else if (config.ASSISTANT_PROVIDER === "gemini" && config.GEMINI_API_KEY)
+    model = new GeminiModel(config.GEMINI_API_KEY, config.ASSISTANT_MODEL);
+  else if (config.ASSISTANT_PROVIDER === "gemini")
+    log.warn("ASSISTANT_PROVIDER=gemini but GEMINI_API_KEY is empty: the assistant answers 503 (set ASSISTANT_PROVIDER=rules to try it offline)");
+  const assistant = new AssistantService(
+    model,
+    commands,
+    async (code) => (await telemetry.recent(code, new Date(Date.now() - 5 * 60_000), 1))[0] ?? null,
+    { timeoutMs: config.ASSISTANT_TIMEOUT_SEC * 1000 },
+    log.child({ module: "assistant" }),
+  );
   const app = await buildApi({
     storage,
     devices,
     telemetry,
     events,
     commands,
+    assistant,
     hub,
     mqttConnected: () => mqtt.isConnected(),
     corsOrigins: config.CORS_ORIGIN,
@@ -85,7 +104,10 @@ async function main() {
     log,
   });
   await app.listen({ port: config.PORT, host: config.HOST });
-  log.info({ prefix: config.MQTT_TOPIC_PREFIX, storage: storage.driver }, "backend ready");
+  log.info(
+    { prefix: config.MQTT_TOPIC_PREFIX, storage: storage.driver, assistant: model?.name ?? "off" },
+    "backend ready",
+  );
 
   let stopping = false;
   const shutdown = async (signal: string) => {

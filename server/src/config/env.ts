@@ -36,6 +36,13 @@ const Env = z.object({
   COMMAND_ACK_TIMEOUT_SEC: positive.default(10),
   /** How much history `GET /api/devices/:code` returns for the charts. */
   SNAPSHOT_TELEMETRY_MIN: positive.default(15),
+
+  // Voice/text assistant (POST /api/devices/:code/assistant). `rules` needs no key and
+  // understands a fixed set of sentences; `off` answers 503.
+  ASSISTANT_PROVIDER: z.enum(["gemini", "rules", "off"]).default("gemini"),
+  GEMINI_API_KEY: z.string().optional(),
+  ASSISTANT_MODEL: z.string().default("gemini-3-flash-preview"),
+  ASSISTANT_TIMEOUT_SEC: positive.default(10),
 }).superRefine((env, ctx) => {
   // Fail at boot rather than on the first write, once MQTT messages are already arriving.
   if (env.STORAGE_DRIVER === "firestore" && !env.GCP_PROJECT_ID) {

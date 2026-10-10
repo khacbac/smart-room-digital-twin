@@ -1,7 +1,8 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyReply } from "fastify";
-import { CommandRequest, DeviceId, type DeviceRecord, type TwinSnapshot } from "@srdt/contracts";
+import { AssistantRequest, CommandRequest, DeviceId, type DeviceRecord, type TwinSnapshot } from "@srdt/contracts";
 import { z } from "zod";
+import { AssistantError, type AssistantService } from "../assistant/assistant.service";
 import type { CommandService } from "../commands/command.service";
 import type { DeviceService } from "../devices/device.service";
 import type { EventService } from "../events/event.service";
@@ -18,6 +19,7 @@ import type { TelemetryService } from "../telemetry/telemetry.service";
 //   GET  /api/devices/:code/stream       → text/event-stream of StreamMessage
 //   POST /api/devices/:code/commands     → 202 { commandId, status } | 409 | 429 | 503
 //   GET  /api/devices/:code/commands?limit=20
+//   POST /api/devices/:code/assistant    → 200 AssistantResponse | 429 | 502 | 503 | 504
 
 export interface ApiDeps {
   storage: Storage;
@@ -25,6 +27,7 @@ export interface ApiDeps {
   telemetry: TelemetryService;
   events: EventService;
   commands: CommandService;
+  assistant?: AssistantService;
   hub: RealtimeHub;
   mqttConnected: () => boolean;
   corsOrigins: string[];
@@ -144,6 +147,27 @@ export async function buildApi(deps: ApiDeps) {
           "BROKER_DISCONNECTED",
           `backend is not connected to the MQTT broker (command ${result.commandId})`,
         );
+    }
+  });
+
+  const ASSISTANT_STATUS = {
+    ASSISTANT_DISABLED: 503,
+    ASSISTANT_TIMEOUT: 504,
+    ASSISTANT_UPSTREAM: 502,
+    RATE_LIMITED: 429,
+  } as const;
+
+  app.post("/api/devices/:code/assistant", async (req, reply) => {
+    const device = await deviceFor(req.params, reply);
+    if (!device) return reply;
+    const body = AssistantRequest.safeParse(req.body);
+    if (!body.success) return sendError(reply, 400, "INVALID_REQUEST", zodMessage(body.error));
+    if (!deps.assistant) return sendError(reply, 503, "ASSISTANT_DISABLED", "voice assistant is not configured on the server");
+    try {
+      return await deps.assistant.ask(device, body.data);
+    } catch (err) {
+      if (err instanceof AssistantError) return sendError(reply, ASSISTANT_STATUS[err.code], err.code, err.message);
+      throw err;
     }
   });
 

@@ -1,0 +1,20 @@
+{"text":"Mở cửa sổ","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":90}]}
+{"text":"Mở hé cửa sổ ra","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":25}]}
+{"text":"Mở cửa sổ một nửa","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":45}]}
+{"text":"Open the window halfway","locale":"en-US","intent":"command","commands":[{"action":"OPEN_WINDOW","value":45}]}
+{"text":"Mở cửa sổ 60 độ","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":60}]}
+{"text":"Mở thêm chút nữa","locale":"vi-VN","room":{"windowAngle":45},"intent":"command","commands":[{"action":"OPEN_WINDOW","value":65}]}
+{"text":"Đóng cửa sổ lại","locale":"vi-VN","room":{"windowAngle":45},"intent":"command","commands":[{"action":"CLOSE_WINDOW","value":null}]}
+{"text":"Close the window","locale":"en-US","room":{"windowAngle":30},"intent":"command","commands":[{"action":"CLOSE_WINDOW","value":null}]}
+{"text":"Tắt còi đi","locale":"vi-VN","room":{"buzzer":true},"intent":"command","commands":[{"action":"BUZZER_OFF","value":null}]}
+{"text":"Silence the alarm","locale":"en-US","room":{"buzzer":true},"intent":"command","commands":[{"action":"BUZZER_OFF","value":null}]}
+{"text":"Bật còi báo động","locale":"vi-VN","intent":"command","commands":[{"action":"BUZZER_ON","value":null}]}
+{"text":"Cho nó tự động lại","locale":"vi-VN","room":{"override":{"window":true,"buzzer":false,"secondsLeft":80}},"intent":"command","commands":[{"action":"CLEAR_OVERRIDE","value":null}]}
+{"text":"Back to automatic","locale":"en-US","room":{"override":{"window":true,"buzzer":false,"secondsLeft":80}},"intent":"command","commands":[{"action":"CLEAR_OVERRIDE","value":null}]}
+{"text":"Đóng cửa và tắt còi","locale":"vi-VN","room":{"windowAngle":90,"buzzer":true},"intent":"command","commands":[{"action":"CLOSE_WINDOW","value":null},{"action":"BUZZER_OFF","value":null}]}
+{"text":"Phòng đang thế nào?","locale":"vi-VN","intent":"query","commands":[]}
+{"text":"Sao lại báo Warning?","locale":"vi-VN","intent":"query","commands":[]}
+{"text":"Trong phòng có ai không?","locale":"vi-VN","intent":"query","commands":[]}
+{"text":"Nóng quá","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":90}]}
+{"text":"Bật điều hoà","locale":"vi-VN","intent":"unsupported","commands":[]}
+{"text":"Làm gì đó đi","locale":"vi-VN","intent":"clarify","commands":[]}

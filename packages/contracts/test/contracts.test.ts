@@ -186,3 +186,19 @@ describe("CommandRequest (§9.6)", () => {
     expect(CommandRequest.safeParse({ action: "REBOOT" }).success).toBe(false);
   });
 });
+
+describe("AssistantRequest", () => {
+  it("trims the text and defaults the history", async () => {
+    const { AssistantRequest } = await import("../src");
+    const r = AssistantRequest.parse({ text: "  mở cửa sổ  ", locale: "vi-VN" });
+    expect(r).toEqual({ text: "mở cửa sổ", locale: "vi-VN", history: [] });
+  });
+
+  it("rejects empty text, unknown locales and long histories", async () => {
+    const { AssistantRequest } = await import("../src");
+    expect(AssistantRequest.safeParse({ text: "   ", locale: "vi-VN" }).success).toBe(false);
+    expect(AssistantRequest.safeParse({ text: "hi", locale: "fr-FR" }).success).toBe(false);
+    const turn = { role: "user", text: "x" };
+    expect(AssistantRequest.safeParse({ text: "hi", locale: "en-US", history: Array(7).fill(turn) }).success).toBe(false);
+  });
+});

@@ -4,3 +4,4 @@ export * from "./status";
 export * from "./event";
 export * from "./command";
 export * from "./twin";
+export * from "./assistant";
