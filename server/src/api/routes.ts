@@ -4,6 +4,7 @@ import { AssistantRequest, CommandRequest, DeviceId, type DeviceRecord, type Twi
 import { z } from "zod";
 import { AssistantError, type AssistantService } from "../assistant/assistant.service";
 import type { CommandService } from "../commands/command.service";
+import { COMMANDS_PER_MINUTE } from "../commands/rate-limit";
 import type { DeviceService } from "../devices/device.service";
 import type { EventService } from "../events/event.service";
 import type { Logger } from "../logger";
@@ -137,7 +138,7 @@ export async function buildApi(deps: ApiDeps) {
       case "accepted":
         return reply.status(202).send({ commandId: result.commandId, status: result.status });
       case "rate_limited":
-        return sendError(reply, 429, "RATE_LIMITED", "at most 10 commands per minute per device");
+        return sendError(reply, 429, "RATE_LIMITED", `at most ${COMMANDS_PER_MINUTE} commands per minute per device`);
       case "device_offline":
         return sendError(reply, 409, "DEVICE_OFFLINE", `device ${device.code} is offline (command ${result.commandId})`);
       case "broker_disconnected":
