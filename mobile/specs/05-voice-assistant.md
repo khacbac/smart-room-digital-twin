@@ -33,7 +33,7 @@ sequenceDiagram
 Vì sao LLM đặt ở server (D12):
 
 - API key không nằm trong APK.
-- Lệnh của AI đi qua đúng các bước như lệnh tay: validate bằng contracts, rate limit 10 lệnh/phút, theo dõi ack và
+- Lệnh của AI đi qua đúng các bước như lệnh tay: validate bằng contracts, rate limit 30 lệnh/phút, theo dõi ack và
   timeout, ghi lịch sử. Dashboard thấy ngay lệnh có `source: "ai"`.
 - Server có sẵn trạng thái twin mới nhất để đưa vào prompt, app không phải gửi lên.
 
@@ -150,7 +150,8 @@ twin-core) để LLM giải thích được "vì sao Warning".
 - Không bao giờ chỉ nói "không làm được". Thiết bị không có (đèn, quạt, điều hoà, nhạc…) → `unsupported`, không gửi
   lệnh, nói phòng không có thiết bị đó rồi **đề nghị** việc gần nhất làm được (nóng → mở cửa sổ; lạnh → đóng cửa;
   đèn → báo độ sáng) dưới dạng câu hỏi có/không, `expectsAnswer: true`. Lượt sau người dùng đồng ý → làm việc đã đề nghị.
-- Action hợp lệ và ý nghĩa: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`.
+- Action hợp lệ và ý nghĩa: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`, `IDENTIFY` (nháy đèn + bíp),
+  `SHOW_MESSAGE` (`text` ≤ 32 ký tự lên màn hình mạch; server bỏ dấu, ví dụ "hiển thị Xin chào lên màn hình").
   Không dùng `PING`.
 - Quy đổi lời nói ra góc: "hé / một chút / a bit" = 25; "một nửa / half" = 45; "mở / mở hết / fully" = 90; "thêm
   chút nữa / a bit more" = góc hiện tại + 20 (tối đa 90); "khép bớt" = góc hiện tại − 20 (≤ 0 thì `CLOSE_WINDOW`).

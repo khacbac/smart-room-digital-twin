@@ -129,6 +129,16 @@ describe("AssistantService", () => {
     expect(normalise([{ action: "OPEN_WINDOW", value: 0.4 }], room)).toEqual([{ action: "OPEN_WINDOW", value: 1 }]);
   });
 
+  it("makes SHOW_MESSAGE text display-safe and drops an empty one", () => {
+    const room = toRoomContext(device(), telemetry, NOW);
+    expect(normalise([{ action: "SHOW_MESSAGE", value: 3, text: "Chào hội đồng" }], room)).toEqual([
+      { action: "SHOW_MESSAGE", value: null, text: "Chao hoi dong" },
+    ]);
+    expect(normalise([{ action: "SHOW_MESSAGE", value: null, text: " " }, { action: "IDENTIFY", value: null }], room)).toEqual([
+      { action: "IDENTIFY", value: null },
+    ]);
+  });
+
   it("drops commands that change nothing", () => {
     const room = toRoomContext(device(), telemetry, NOW);
     expect(normalise([{ action: "CLOSE_WINDOW", value: null }, { action: "BUZZER_OFF", value: null }, { action: "CLEAR_OVERRIDE", value: null }], room)).toEqual([]);
@@ -269,6 +279,17 @@ describe("RulesModel", () => {
     const p = await plan(text);
     expect(p.intent).toBe("command");
     expect(p.commands).toEqual(commands);
+  });
+
+  it("shows a message on the screen and identifies the board", async () => {
+    expect((await plan("Hiển thị Xin chào hội đồng lên màn hình")).commands).toEqual([
+      { action: "SHOW_MESSAGE", value: null, text: "Xin chào hội đồng" },
+    ]);
+    expect((await plan('Show "Hello class" on the screen')).commands).toEqual([
+      { action: "SHOW_MESSAGE", value: null, text: "Hello class" },
+    ]);
+    expect((await plan("Nháy đèn lên đi")).commands).toEqual([{ action: "IDENTIFY", value: null }]);
+    expect((await plan("Where are you?")).commands).toEqual([{ action: "IDENTIFY", value: null }]);
   });
 
   it("opens a bit more from the current angle", async () => {

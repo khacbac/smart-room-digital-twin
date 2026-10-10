@@ -377,8 +377,13 @@ cd device && pio run -e esp32-s3 -e node -e gateway -e kit -e node-kit   # build
 | GET | `/api/devices/:code/commands?limit=` | lịch sử command |
 | POST | `/api/devices/:code/assistant` | `{ text, locale, history? }` → `200 { intent, reply, commands, pendingConfirmation }` / `429` / `502` / `503 ASSISTANT_DISABLED` / `504`. Lệnh gửi với `source: "ai"` (app mobile, [`mobile/specs/05-voice-assistant.md`](mobile/specs/05-voice-assistant.md)) |
 
-Action: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`, `PING`.
-Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_OVERRIDE`) thì edge rules điều khiển lại.
+Action: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`, `PING`,
+`IDENTIFY` (mạch nháy 3 LED + bíp 3 s, màn hình hiện device id), `SHOW_MESSAGE` (`text` 1–32 ký tự, hiện trên LCD/OLED
+15 s; backend bỏ dấu tiếng Việt vì màn hình chỉ có ASCII).
+Lệnh cửa sổ/còi từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_OVERRIDE`) thì edge rules điều khiển lại.
+`IDENTIFY` và `SHOW_MESSAGE` chỉ là hiệu ứng trên mạch, không phải override và không đổi trạng thái twin.
+Dashboard và app có thêm **Scenes** (Welcome / Ventilate / Good night / Automatic): mỗi scene gửi 2 lệnh thường
+liên tiếp (`packages/twin-core/src/scenes.ts`). Serial console: `identify`, `msg <text>`.
 
 ## 9. Cấu trúc thư mục
 

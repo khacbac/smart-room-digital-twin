@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CommandAck, CommandMessage, CommandRequest, DeviceEvent, Status, Telemetry } from "../src";
+import { CommandAck, CommandMessage, CommandRequest, DeviceEvent, Status, Telemetry, toDisplayText } from "../src";
 
 // Payloads shaped like the ones device/lib/protocol builds (spec §5.3–§5.7).
 const telemetry = {
@@ -184,6 +184,22 @@ describe("CommandRequest (§9.6)", () => {
 
   it("rejects an unknown action", () => {
     expect(CommandRequest.safeParse({ action: "REBOOT" }).success).toBe(false);
+  });
+
+  it("SHOW_MESSAGE needs 1-32 characters of display text", () => {
+    expect(CommandRequest.safeParse({ action: "SHOW_MESSAGE", text: "Xin chào hội đồng" }).success).toBe(true);
+    expect(CommandRequest.safeParse({ action: "SHOW_MESSAGE" }).success).toBe(false);
+    expect(CommandRequest.safeParse({ action: "SHOW_MESSAGE", text: "   " }).success).toBe(false);
+    expect(CommandRequest.safeParse({ action: "SHOW_MESSAGE", text: "x".repeat(33) }).success).toBe(false);
+    expect(CommandRequest.safeParse({ action: "IDENTIFY", source: "dashboard" }).success).toBe(true);
+  });
+});
+
+describe("toDisplayText", () => {
+  it("strips Vietnamese accents and keeps printable ASCII", () => {
+    expect(toDisplayText("Xin chào hội đồng!")).toBe("Xin chao hoi dong!");
+    expect(toDisplayText("Đường  đi\n nhé")).toBe("Duong di nhe");
+    expect(toDisplayText("Hi 👋")).toBe("Hi ??");
   });
 });
 

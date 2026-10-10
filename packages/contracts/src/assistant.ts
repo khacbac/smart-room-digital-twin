@@ -28,6 +28,8 @@ export type AssistantIntent = z.infer<typeof AssistantIntent>;
 export interface AssistantCommandResult {
   action: CommandAction;
   value: number | null;
+  /** SHOW_MESSAGE text as sent to the device. */
+  text?: string | null;
   /** null when the command was not created (rate limited). */
   commandId: string | null;
   /** Status at response time; the app follows the rest over SSE. */

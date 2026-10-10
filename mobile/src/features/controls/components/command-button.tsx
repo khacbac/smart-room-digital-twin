@@ -14,16 +14,17 @@ export function CommandButton(
   props: Omit<ButtonProps, "onPress" | "loading"> & {
     action: CommandAction;
     value?: number;
+    text?: string;
     /** Ask first (the alarm makes a real sound in the room). */
     confirm?: { title: string; message: string; ok: string };
     disabledReason?: boolean;
   },
 ) {
-  const { action, value, confirm, disabledReason, ...button } = props;
+  const { action, value, text, confirm, disabledReason, ...button } = props;
   const online = useAtomValue(onlineAtom);
   const busy = useAtomValue(busyFamily(action));
   const send = useSetAtom(sendCommandAtom);
-  const go = () => void send({ action, value });
+  const go = () => void send({ action, value, text });
   return (
     <Button
       {...button}

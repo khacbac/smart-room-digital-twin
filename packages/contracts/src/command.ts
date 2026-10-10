@@ -9,6 +9,8 @@ export const CommandAction = z.enum([
   "BUZZER_OFF",
   "CLEAR_OVERRIDE",
   "PING",
+  "IDENTIFY",
+  "SHOW_MESSAGE",
 ]);
 export type CommandAction = z.infer<typeof CommandAction>;
 
@@ -31,12 +33,32 @@ export type CommandFailReason = z.infer<typeof CommandFailReason>;
 export const WINDOW_ANGLE_MIN = 1;
 export const WINDOW_ANGLE_MAX = 90;
 
+/** SHOW_MESSAGE `text`: what fits the 16x2 LCD (the OLED shows the same). */
+export const MESSAGE_MAX = 32;
+
+/**
+ * The device displays printable ASCII only: Vietnamese accents are stripped
+ * ("Xin chào" → "Xin chao", "đ" → "d"), other characters become "?", whitespace collapses.
+ */
+export function toDisplayText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/\s+/g, " ")
+    .replace(/[^\x20-\x7e]/g, "?")
+    .trim();
+}
+
 // §5.6 `{prefix}/{deviceId}/command` (backend → device)
 export const CommandMessage = z.object({
   v: z.literal(1),
   commandId: z.string().uuid(),
   action: CommandAction,
   value: z.number().int().min(WINDOW_ANGLE_MIN).max(WINDOW_ANGLE_MAX).optional(),
+  /** SHOW_MESSAGE only, already `toDisplayText`. */
+  text: z.string().min(1).max(MESSAGE_MAX).optional(),
   source: CommandSource,
   ts: z.number().int().positive(),
 });
@@ -58,13 +80,26 @@ export type CommandAck = z.infer<typeof CommandAck>;
 
 // Body of `POST /api/devices/:code/commands`. `value` only matters for
 // OPEN_WINDOW (integer 1–90, optional); it is ignored for every other action.
+// `text` is required for SHOW_MESSAGE (1–32 chars after `toDisplayText`), ignored otherwise.
 export const CommandRequest = z
   .object({
     action: CommandAction,
     value: z.number().nullish(),
+    text: z.string().nullish(),
     source: z.enum(["dashboard", "ai"]).optional(),
   })
   .superRefine((body, ctx) => {
+    if (body.action === "SHOW_MESSAGE") {
+      const len = toDisplayText(body.text ?? "").length;
+      if (len < 1 || len > MESSAGE_MAX) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["text"],
+          message: `SHOW_MESSAGE text must be 1-${MESSAGE_MAX} characters`,
+        });
+      }
+      return;
+    }
     if (body.action !== "OPEN_WINDOW" || body.value == null) return;
     if (!Number.isInteger(body.value) || body.value < WINDOW_ANGLE_MIN || body.value > WINDOW_ANGLE_MAX) {
       ctx.addIssue({

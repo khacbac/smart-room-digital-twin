@@ -265,6 +265,27 @@ describe("downlink (command round trip)", () => {
     expect(statuses).toEqual(["pending", "sent", "executed"]);
   });
 
+  it("SHOW_MESSAGE goes out with display-safe text and keeps it on the record", async () => {
+    const t = await setup();
+    await t.receive("telemetry", telemetryMsg());
+    const res = await t.commands.create(t.devices.get("room-01")!, {
+      action: "SHOW_MESSAGE",
+      text: "Xin chào hội đồng",
+      value: 45,
+      source: "dashboard",
+    });
+    if (res.kind !== "accepted") throw new Error("not accepted");
+    expect(t.mqtt.published[0]!.payload).toEqual({
+      v: 1,
+      commandId: res.commandId,
+      action: "SHOW_MESSAGE",
+      text: "Xin chao hoi dong",
+      source: "dashboard",
+      ts: expect.any(Number),
+    });
+    expect((await t.storage.commands.get(res.commandId))?.text).toBe("Xin chao hoi dong");
+  });
+
   it("an ack before the PUBACK is kept", async () => {
     const t = await setup();
     await t.receive("telemetry", telemetryMsg());

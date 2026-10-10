@@ -8,7 +8,9 @@ import { Text } from "@/components/text";
 import { useTheme } from "@/lib/theme/theme";
 import { AlarmCard } from "@/features/controls/components/alarm-card";
 import { AutoControlCard } from "@/features/controls/components/auto-control-card";
+import { BoardCard } from "@/features/controls/components/board-card";
 import { CommandHistory } from "@/features/controls/components/command-history";
+import { ScenesCard } from "@/features/controls/components/scenes-card";
 import { WindowCard } from "@/features/controls/components/window-card";
 import { onlineAtom } from "@/features/twin/_atoms/derived";
 
@@ -27,8 +29,10 @@ export default function ControlsScreen() {
           </View>
         </Card>
       )}
+      <ScenesCard />
       <WindowCard />
       <AlarmCard />
+      <BoardCard />
       <AutoControlCard />
       <CommandHistory />
     </Screen>

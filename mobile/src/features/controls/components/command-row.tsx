@@ -29,6 +29,7 @@ export function CommandRow({ command: c, showLatency }: { command: CommandRecord
         <Text variant="label" numberOfLines={1}>
           {ACTION_LABEL[c.action]}
           {c.value != null && c.action === "OPEN_WINDOW" ? ` ${c.value}°` : ""}
+          {c.text ? ` “${c.text}”` : ""}
         </Text>
         {(c.reason || latency) && (
           <Text variant="caption" tone="muted" numberOfLines={1}>

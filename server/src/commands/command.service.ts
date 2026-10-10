@@ -6,6 +6,7 @@ import type {
   CommandStatus,
   DeviceRecord,
 } from "@srdt/contracts";
+import { toDisplayText } from "@srdt/contracts";
 import type { ServerEventSink } from "../events/event.service";
 import type { Logger } from "../logger";
 import { commandTopic } from "../mqtt/topics";
@@ -58,8 +59,9 @@ export class CommandService {
     if (!this.limiter.allow(device.code, this.now())) return { kind: "rate_limited" };
 
     const value = req.action === "OPEN_WINDOW" ? (req.value ?? null) : null;
+    const text = req.action === "SHOW_MESSAGE" ? toDisplayText(req.text ?? "") : null;
     const source = req.source ?? "api";
-    const row = await this.store.insert({ deviceCode: device.code, action: req.action, value, source });
+    const row = await this.store.insert({ deviceCode: device.code, action: req.action, value, text, source });
     this.pushed(row);
     const log = this.log.child({ device: device.code, commandId: row.id, action: row.action });
 
@@ -82,6 +84,7 @@ export class CommandService {
       commandId: row.id,
       action: row.action,
       ...(value !== null && { value }),
+      ...(text !== null && { text }),
       source,
       ts: this.now(),
     };

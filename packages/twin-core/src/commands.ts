@@ -14,6 +14,8 @@ export const ACTION_LABEL: Record<CommandAction, string> = {
   BUZZER_OFF: "Silence alarm",
   CLEAR_OVERRIDE: "Resume automatic control",
   PING: "Check connection",
+  IDENTIFY: "Identify device",
+  SHOW_MESSAGE: "Show message",
 };
 
 const GROUP: Record<CommandAction, CommandGroup | null> = {
@@ -23,6 +25,8 @@ const GROUP: Record<CommandAction, CommandGroup | null> = {
   BUZZER_OFF: "buzzer",
   CLEAR_OVERRIDE: "all",
   PING: null,
+  IDENTIFY: null,
+  SHOW_MESSAGE: null,
 };
 
 export function actionGroup(action: CommandAction): CommandGroup | null {

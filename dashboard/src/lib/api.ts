@@ -17,6 +17,8 @@ export class ApiError extends Error {
 export interface CommandBody {
   action: CommandAction;
   value?: number;
+  /** SHOW_MESSAGE only. */
+  text?: string;
   source: "dashboard";
 }
 

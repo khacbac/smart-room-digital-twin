@@ -35,6 +35,20 @@ const BIT = /\b(he|mot chut|chut|a bit|slightly|a little|crack)\b/;
 const HOT = /\b(nong|ngot ngat|bi|hot|stuffy|warm)\b/;
 const QUERY = /\b(the nao|sao|bao nhieu|co ai|khong|nhu nao|how|what|why|is (there|anyone)|status|temperature|nhiet do|do am|humidity)\b/;
 const VAGUE = /\b(lam gi do|gi do|something|anything)\b/;
+const IDENTIFY = /\b(nhay den|bao hieu|dinh vi|o dau|identify|blink|where are you|which (board|device))\b/;
+const SCREEN = /\b(man hinh|screen|lcd|oled)\b/;
+const SHOW = /\b(hien thi|hien|ghi|viet|show|display|write|put)\b/;
+
+/** "Hiển thị Xin chào lên màn hình" → "Xin chào"; a quoted text wins. */
+function messageFrom(text: string): string {
+  const quoted = text.match(/["“'‘]([^"”'’]+)["”'’]/);
+  if (quoted) return quoted[1]!.trim();
+  return text
+    .replace(/\s*(lên|len|ra|trên|tren|on|to|onto)?\s*(the\s+)?(màn hình|man hinh|screen|lcd|oled)\s*[.!?]*\s*$/iu, "")
+    .replace(/^\s*(hãy|hay|please)?\s*(hiển thị|hien thi|hiện|hien|ghi|viết|viet|show|display|write|put)\s+(chữ|chu|dòng chữ|dong chu|câu|cau)?\s*(the\s+)?(text|message|words)?\s*/iu, "")
+    .trim();
+}
+
 const YES = /^(co|u|uh|um|ok|oke|okay|dong y|duoc|vang|da|yes|yeah|yep|sure|please|go ahead|do it)( (di|nhe|nha|lam di|please))?$/;
 
 const OFFER_VI = "Mình mở cửa sổ một nửa cho thoáng nhé?";
@@ -100,6 +114,22 @@ export class RulesModel implements AssistantModel {
         intent: "command",
         commands: [{ action: "OPEN_WINDOW", value: 45 }],
         reply: say("Mình đang mở cửa sổ 45 độ. Chế độ tay giữ 2 phút.", "Opening the window to 45 degrees. Manual mode lasts 2 minutes."),
+      };
+
+    if (has(s, SCREEN) && has(s, SHOW) && room.online) {
+      const message = messageFrom(text);
+      if (message)
+        return {
+          intent: "command",
+          commands: [{ action: "SHOW_MESSAGE", value: null, text: message }],
+          reply: say(`Mình đang hiển thị "${message}" lên màn hình.`, `Showing "${message}" on the screen.`),
+        };
+    }
+    if (has(s, IDENTIFY) && room.online)
+      return {
+        intent: "command",
+        commands: [{ action: "IDENTIFY", value: null }],
+        reply: say("Mình đây, đang nháy đèn và kêu bíp.", "Here I am, blinking my lights and beeping."),
       };
 
     if (has(s, UNSUPPORTED) && !has(s, WINDOW) && !has(s, BUZZER))

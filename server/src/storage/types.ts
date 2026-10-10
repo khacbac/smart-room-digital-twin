@@ -36,7 +36,7 @@ export interface EventStore {
   recent(deviceCode: string, limit: number): Promise<EventRecord[]>;
 }
 
-export type NewCommand = Pick<CommandRecord, "deviceCode" | "action" | "value" | "source">;
+export type NewCommand = Pick<CommandRecord, "deviceCode" | "action" | "value" | "text" | "source">;
 
 export interface CommandStore {
   /** `status = pending`, `createdAt = now`, new id. */

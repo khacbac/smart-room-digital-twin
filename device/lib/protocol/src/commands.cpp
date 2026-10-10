@@ -8,7 +8,7 @@ namespace proto {
 
 namespace {
 
-enum class Action : uint8_t { OpenWindow, CloseWindow, BuzzerOn, BuzzerOff, ClearOverride, Ping };
+enum class Action : uint8_t { OpenWindow, CloseWindow, BuzzerOn, BuzzerOff, ClearOverride, Ping, Identify, ShowMessage };
 
 struct ActionName {
     const char* name;
@@ -19,7 +19,15 @@ const ActionName kActions[] = {
     {"OPEN_WINDOW", Action::OpenWindow},       {"CLOSE_WINDOW", Action::CloseWindow},
     {"BUZZER_ON", Action::BuzzerOn},           {"BUZZER_OFF", Action::BuzzerOff},
     {"CLEAR_OVERRIDE", Action::ClearOverride}, {"PING", Action::Ping},
+    {"IDENTIFY", Action::Identify},            {"SHOW_MESSAGE", Action::ShowMessage},
 };
+
+bool printableAscii(const char* s) {
+    for (; *s; s++) {
+        if (*s < 0x20 || *s > 0x7e) return false;
+    }
+    return true;
+}
 
 bool parseSource(const char* s, edge::OverrideSource& out) {
     if (!strcmp(s, "dashboard")) out = edge::OverrideSource::Dashboard;
@@ -109,6 +117,19 @@ CommandResult CommandHandler::handle(edge::Engine& engine, const char* payload, 
         }
     }
 
+    // SHOW_MESSAGE: `text` is a required string of 1–32 printable ASCII chars.
+    if (r.reason == RejectReason::None && action == Action::ShowMessage) {
+        const JsonVariant textVar = doc["text"];
+        const char* text = textVar.as<const char*>();
+        if (!textVar.is<const char*>() || !text[0] || !printableAscii(text)) {
+            r.reason = RejectReason::InvalidPayload;
+        } else if (strlen(text) > kMessageMax) {
+            r.reason = RejectReason::ValueOutOfRange;
+        } else {
+            strcpy(r.text, text);
+        }
+    }
+
     if (r.reason == RejectReason::None) {
         switch (action) {
             case Action::OpenWindow: engine.overrideWindow(angle, source, nowMs); break;
@@ -117,6 +138,8 @@ CommandResult CommandHandler::handle(edge::Engine& engine, const char* payload, 
             case Action::BuzzerOff: engine.overrideBuzzer(false, source, nowMs); break;
             case Action::ClearOverride: engine.clearOverrides(edge::ClearReason::Command); break;
             case Action::Ping: break;
+            case Action::Identify: r.effect = Effect::Identify; break;
+            case Action::ShowMessage: r.effect = Effect::Message; break;
         }
         r.status = AckStatus::Executed;
         r.executed = true;

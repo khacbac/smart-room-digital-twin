@@ -300,6 +300,31 @@ static void test_close_window_buzzer_clear_ping() {
     TEST_ASSERT_TRUE(engine.buzzerOn());
 }
 
+static void test_identify_and_show_message() {
+    settle(25, 50, 300);
+    drainEvents();
+    CommandResult r = command(R"({"v":1,"commandId":"i1","action":"IDENTIFY","source":"dashboard"})");
+    assertAck(r, AckStatus::Executed, RejectReason::None);
+    TEST_ASSERT_EQUAL((int)Effect::Identify, (int)r.effect);
+    Event e;
+    TEST_ASSERT_FALSE(engine.popEvent(e));  // no override, no engine change
+
+    r = command(R"({"v":1,"commandId":"m1","action":"SHOW_MESSAGE","text":"Xin chao hoi dong","source":"ai"})");
+    assertAck(r, AckStatus::Executed, RejectReason::None);
+    TEST_ASSERT_EQUAL((int)Effect::Message, (int)r.effect);
+    TEST_ASSERT_EQUAL_STRING("Xin chao hoi dong", r.text);
+
+    r = command(R"({"v":1,"commandId":"m2","action":"SHOW_MESSAGE","source":"api"})");
+    assertAck(r, AckStatus::Rejected, RejectReason::InvalidPayload);
+    TEST_ASSERT_EQUAL((int)Effect::None, (int)r.effect);
+    assertAck(command(R"({"v":1,"commandId":"m3","action":"SHOW_MESSAGE","text":"","source":"api"})"),
+              AckStatus::Rejected, RejectReason::InvalidPayload);
+    assertAck(command(R"({"v":1,"commandId":"m4","action":"SHOW_MESSAGE","text":"Xin ch\u00e0o","source":"api"})"),
+              AckStatus::Rejected, RejectReason::InvalidPayload);
+    assertAck(command(R"({"v":1,"commandId":"m5","action":"SHOW_MESSAGE","text":"123456789012345678901234567890123","source":"api"})"),
+              AckStatus::Rejected, RejectReason::ValueOutOfRange);
+}
+
 static void test_validation_rejects_with_reason() {
     settle(25, 50, 300);
     assertRejected(R"({"v":2,"commandId":"r1","action":"PING","source":"api"})", RejectReason::UnsupportedVersion);
@@ -410,6 +435,7 @@ int main(int, char**) {
     RUN_TEST(test_command_rejected_event_truncates_raw);
     RUN_TEST(test_open_window_default_and_value);
     RUN_TEST(test_close_window_buzzer_clear_ping);
+    RUN_TEST(test_identify_and_show_message);
     RUN_TEST(test_validation_rejects_with_reason);
     RUN_TEST(test_unparsable_command_is_not_ackable);
     RUN_TEST(test_duplicate_is_reacked_not_reexecuted);

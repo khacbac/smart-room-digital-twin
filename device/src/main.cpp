@@ -212,6 +212,67 @@ static void onConnected(uint32_t nowMs) {
          proto::buildBootEvent(meta(true), FW_VERSION, resetReasonName(esp_reset_reason()), payload, sizeof(payload)));
 }
 
+// ---- Command effects: IDENTIFY and SHOW_MESSAGE ------------------------------------
+// Shown on top of the engine's outputs, never fed back into it: telemetry, status and
+// the twin keep reporting the real state while the board blinks or shows a message.
+
+static bool identifyOn = false;
+static uint32_t identifyAt = 0;
+static bool messageOn = false;
+static uint32_t messageAt = 0;
+static char messageText[proto::kMessageMax + 1];
+static uint32_t chirpAt = 0;
+static bool chirpOn = false;
+
+static void startIdentify(uint32_t nowMs) {
+    identifyOn = true;
+    identifyAt = nowMs;
+    display::showMessage("IDENTIFY", DEVICE_ID);
+}
+
+static void startMessage(const char* text, uint32_t nowMs) {
+    strncpy(messageText, text, sizeof(messageText) - 1);
+    messageText[sizeof(messageText) - 1] = '\0';
+    messageOn = true;
+    messageAt = nowMs;
+    chirpOn = true;
+    chirpAt = nowMs;
+    if (!identifyOn) display::showMessage("MESSAGE", messageText);
+}
+
+static void runEffect(const proto::CommandResult& r, uint32_t nowMs) {
+    if (r.effect == proto::Effect::Identify) startIdentify(nowMs);
+    else if (r.effect == proto::Effect::Message) startMessage(r.text, nowMs);
+}
+
+// Ends the effects that ran out; the display goes back to the message or the rows.
+static void expireEffects(uint32_t nowMs) {
+    if (chirpOn && nowMs - chirpAt >= MESSAGE_CHIRP_MS) chirpOn = false;
+    if (messageOn && nowMs - messageAt >= MESSAGE_SHOW_MS) {
+        messageOn = false;
+        if (!identifyOn) display::endMessage();
+    }
+    if (identifyOn && nowMs - identifyAt >= IDENTIFY_MS) {
+        identifyOn = false;
+        if (messageOn) display::showMessage("MESSAGE", messageText);
+        else display::endMessage();
+    }
+}
+
+static edge::Outputs withEffects(edge::Outputs o, uint32_t nowMs) {
+    if (identifyOn) {
+        const uint32_t t = nowMs - identifyAt;
+        const uint32_t step = (t / 150) % 3;  // green → yellow → red chase
+        o.green = step == 0;
+        o.yellow = step == 1;
+        o.red = step == 2;
+        o.buzzerPin = t % 500 < 80;  // two short beeps a second
+    } else if (chirpOn) {
+        o.buzzerPin = true;
+    }
+    return o;
+}
+
 // §5.6 / §5.7: validate → execute → status (retained) → ack (§6.6).
 static void handleMqttCommand(const NetCommand& msg, uint32_t nowMs) {
     const proto::CommandResult r = commands.handle(engine, msg.payload, msg.len, nowMs);
@@ -226,7 +287,10 @@ static void handleMqttCommand(const NetCommand& msg, uint32_t nowMs) {
     const char* reason = proto::rejectReasonName(r.reason);
     Serial.printf("[cmd] %s -> %s%s%s%s\n", r.commandId, proto::ackStatusName(r.status), reason ? " " : "",
                   reason ? reason : "", r.duplicate ? " (duplicate, not re-executed)" : "");
-    if (r.executed) publishStatus(nowMs);
+    if (r.executed) {
+        publishStatus(nowMs);
+        runEffect(r, nowMs);
+    }
     if (net::online()) send(Channel::Ack, proto::buildAck(engine, meta(false), r, nowMs, payload, sizeof(payload)));
 }
 
@@ -243,6 +307,8 @@ static void printHelp() {
         "  close          CLOSE_WINDOW → window override\n"
         "  buzz on|off    BUZZER_ON / BUZZER_OFF → buzzer override\n"
         "  clear          CLEAR_OVERRIDE\n"
+        "  identify       IDENTIFY: blink the LEDs, beep, show the device id\n"
+        "  msg <text>     SHOW_MESSAGE: text on the display for 15 s (ASCII, max 32)\n"
         "  ai [on|off]    TinyML controller drives window/buzzer (rules stay the safety floor)");
 }
 
@@ -259,6 +325,16 @@ static void printAi() {
 }
 
 static void handleCommand(char* line, uint32_t nowMs) {
+    // `msg` keeps its spaces, so it is matched before strtok splits the line.
+    if (!strncmp(line, "msg ", 4)) {
+        const char* text = line + 4;
+        if (!text[0] || strlen(text) > proto::kMessageMax) {
+            Serial.println("[cmd] msg: 1-32 chars (VALUE_OUT_OF_RANGE)");
+            return;
+        }
+        startMessage(text, nowMs);
+        return;
+    }
     char* cmd = strtok(line, " ");
     char* arg = strtok(nullptr, " ");
     if (!cmd) return;
@@ -287,6 +363,8 @@ static void handleCommand(char* line, uint32_t nowMs) {
         engine.overrideBuzzer(!strcmp(arg, "on"), src, nowMs);
     } else if (!strcmp(cmd, "clear")) {
         engine.clearOverrides(edge::ClearReason::Command);
+    } else if (!strcmp(cmd, "identify")) {
+        startIdentify(nowMs);
     } else if (!strcmp(cmd, "ai")) {
         if (arg && (!strcmp(arg, "on") || !strcmp(arg, "off"))) {
             aiControl = !strcmp(arg, "on");
@@ -420,7 +498,8 @@ void loop() {
     static NetCommand cmd;
     while (net::popCommand(cmd)) handleMqttCommand(cmd, now);
 
-    applyOutputs(engine.tick(now));
+    expireEffects(now);
+    applyOutputs(withEffects(engine.tick(now), now));
 
     edge::Event e;
     while (engine.popEvent(e)) {

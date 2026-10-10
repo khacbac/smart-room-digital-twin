@@ -1,4 +1,6 @@
 import {
+  MESSAGE_MAX,
+  toDisplayText,
   WINDOW_ANGLE_MAX,
   WINDOW_ANGLE_MIN,
   type AssistantCommandResult,
@@ -29,7 +31,7 @@ export class AssistantError extends Error {
 
 export interface AssistantServiceOptions {
   timeoutMs: number;
-  /** Utterances per minute per device; separate from the 10 commands/min limit. */
+  /** Utterances per minute per device; separate from the commands/min limit. */
   perMinute?: number;
 }
 
@@ -82,6 +84,7 @@ export class AssistantService {
       const result = await this.commands.create(device, {
         action: cmd.action,
         value: cmd.action === "OPEN_WINDOW" ? cmd.value : null,
+        text: cmd.text,
         source: "ai",
       });
       if (result.kind === "accepted") {
@@ -147,11 +150,17 @@ export class AssistantService {
 
 /**
  * Makes the model's commands safe to send: OPEN_WINDOW gets an integer angle in range
- * (90 when missing), and commands that would change nothing are dropped.
+ * (90 when missing), SHOW_MESSAGE a display-safe text (dropped when empty), and commands
+ * that would change nothing are dropped.
  */
 export function normalise(commands: AssistantPlan["commands"], room: RoomContext) {
-  const out: { action: AssistantPlan["commands"][number]["action"]; value: number | null }[] = [];
+  const out: { action: AssistantPlan["commands"][number]["action"]; value: number | null; text?: string }[] = [];
   for (const c of commands) {
+    if (c.action === "SHOW_MESSAGE") {
+      const text = toDisplayText(c.text ?? "").slice(0, MESSAGE_MAX).trim();
+      if (text && !out.some((o) => o.action === c.action)) out.push({ action: c.action, value: null, text });
+      continue;
+    }
     const value =
       c.action === "OPEN_WINDOW"
         ? Math.min(WINDOW_ANGLE_MAX, Math.max(WINDOW_ANGLE_MIN, Math.round(c.value ?? WINDOW_ANGLE_MAX)))

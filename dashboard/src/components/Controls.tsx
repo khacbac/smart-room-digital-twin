@@ -1,29 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type {
-  CommandAction,
-  CommandRecord,
-  CommandStatus,
-  ReportedState,
+import {
+  MESSAGE_MAX,
+  toDisplayText,
+  type CommandAction,
+  type CommandRecord,
+  type CommandStatus,
+  type ReportedState,
 } from "@srdt/contracts";
 import {
   ACTION_LABEL,
+  SCENES,
   apiErrorText,
   clockTime,
   isBusy,
   isOpenStatus as isOpen,
   resultText,
   windowLabel,
+  type Scene,
+  type SceneId,
 } from "@srdt/twin-core";
 import {
   ArrowUpRight,
+  BedDouble,
+  Cpu,
   History,
+  Lightbulb,
   PanelsTopLeft,
   RotateCcw,
+  Send,
   SlidersHorizontal,
+  Sparkles,
   Volume2,
   VolumeX,
+  Wind,
   type LucideIcon,
 } from "lucide-react";
 import { ApiError, sendCommand, type CommandBody } from "@/lib/api";
@@ -41,6 +52,7 @@ export function useCommandSender(
   const awaited = useRef(new Set<string>());
   const latest = useRef(commands); // `send` must see records that arrived while the request ran
   const [requesting, setRequesting] = useState<CommandAction[]>([]);
+  const [runningScene, setRunningScene] = useState<SceneId | null>(null);
 
   useEffect(() => {
     latest.current = commands;
@@ -52,7 +64,8 @@ export function useCommandSender(
     }
   }, [commands, toast]);
 
-  const send = async (body: CommandBody) => {
+  /** Resolves to false when the backend refused the command. */
+  const send = async (body: CommandBody): Promise<boolean> => {
     setRequesting((r) => [...r, body.action]);
     try {
       const res = await sendCommand(deviceCode, body);
@@ -68,12 +81,14 @@ export function useCommandSender(
           res.status === "executed" ? "success" : "error",
           `${ACTION_LABEL[body.action]} ${res.status}`,
         );
+      return true;
     } catch (err) {
       const text =
         err instanceof ApiError
           ? apiErrorText(err.code, err.message)
           : String(err);
       toast("error", `${ACTION_LABEL[body.action]}: ${text}`);
+      return false;
     } finally {
       setRequesting((r) => {
         const i = r.indexOf(body.action);
@@ -86,7 +101,20 @@ export function useCommandSender(
   const busy = (action: CommandAction) =>
     isBusy(action, requesting, commands);
 
-  return { send, busy };
+  /** A scene's steps one after the other; stops at the first refused one. */
+  const runScene = async (scene: Scene) => {
+    if (runningScene) return;
+    setRunningScene(scene.id);
+    try {
+      for (const step of scene.steps) {
+        if (!(await send({ ...step, source: "dashboard" }))) break;
+      }
+    } finally {
+      setRunningScene(null);
+    }
+  };
+
+  return { send, busy, runScene, runningScene };
 }
 
 const STATUS_CLASS: Record<CommandStatus, string> = {
@@ -105,6 +133,8 @@ function ActionButton(props: {
   icon: LucideIcon;
   tone?: "danger";
   value?: number;
+  text?: string;
+  disabled?: boolean;
   online: boolean;
   sender: ReturnType<typeof useCommandSender>;
 }) {
@@ -114,11 +144,12 @@ function ActionButton(props: {
     <button
       type="button"
       className={`button${props.quiet ? " button-quiet" : ""}${props.tone === "danger" ? " button-danger" : ""}`}
-      disabled={!props.online || isBusy}
+      disabled={!props.online || isBusy || props.disabled}
       onClick={() =>
         void props.sender.send({
           action: props.action,
           value: props.value,
+          text: props.text,
           source: "dashboard",
         })
       }
@@ -130,6 +161,118 @@ function ActionButton(props: {
       )}
       {props.label}
     </button>
+  );
+}
+
+const SCENE_ICON: Record<SceneId, LucideIcon> = {
+  welcome: Sparkles,
+  ventilate: Wind,
+  sleep: BedDouble,
+  auto: RotateCcw,
+};
+
+function Scenes(props: {
+  online: boolean;
+  sender: ReturnType<typeof useCommandSender>;
+}) {
+  const { runningScene, runScene } = props.sender;
+  return (
+    <div className="scenes" aria-label="Scenes">
+      {SCENES.map((s) => {
+        const Icon = SCENE_ICON[s.id];
+        const running = runningScene === s.id;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            className={`scene${running ? " scene-running" : ""}`}
+            disabled={!props.online || runningScene !== null}
+            title={s.description}
+            onClick={() => void runScene(s)}
+          >
+            {running ? (
+              <span className="spinner" aria-label="pending" />
+            ) : (
+              <Icon size={16} aria-hidden="true" />
+            )}
+            <span className="scene-label">{s.label}</span>
+            <span className="small muted scene-description">
+              {s.description}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BoardControls(props: {
+  online: boolean;
+  sender: ReturnType<typeof useCommandSender>;
+}) {
+  const [message, setMessage] = useState("");
+  const shown = toDisplayText(message);
+  const tooLong = shown.length > MESSAGE_MAX;
+  const common = { online: props.online, sender: props.sender };
+  return (
+    <>
+      <div className="control-group-heading alarm-heading">
+        <span className="control-icon">
+          <Cpu size={19} aria-hidden="true" />
+        </span>
+        <div>
+          <h3>Board</h3>
+          <span className="small muted">
+            Message on the screen, or blink to find it
+          </span>
+        </div>
+      </div>
+      <form
+        className="message-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!shown || tooLong || !props.online) return;
+          void props.sender.send({
+            action: "SHOW_MESSAGE",
+            text: message,
+            source: "dashboard",
+          });
+        }}
+      >
+        <input
+          type="text"
+          className={`message-input${tooLong ? " message-input-bad" : ""}`}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Xin chào hội đồng!"
+          aria-label="Message for the board screen"
+          disabled={!props.online}
+        />
+        <span className={`small ${tooLong ? "message-count-bad" : "muted"}`}>
+          {shown.length}/{MESSAGE_MAX}
+        </span>
+      </form>
+      <p className="small muted message-preview">
+        {shown ? `Shows: ${shown}` : "Accents are removed on the board."}
+      </p>
+      <div className="controls">
+        <ActionButton
+          action="SHOW_MESSAGE"
+          label="Show"
+          icon={Send}
+          text={message}
+          disabled={!shown || tooLong}
+          {...common}
+        />
+        <ActionButton
+          action="IDENTIFY"
+          label="Identify"
+          icon={Lightbulb}
+          quiet
+          {...common}
+        />
+      </div>
+    </>
   );
 }
 
@@ -165,6 +308,7 @@ export function Controls(props: {
           Your device is offline. Controls will be available when it reconnects.
         </p>
       )}
+      <Scenes {...common} />
       <div className="control-group-heading">
         <span className="control-icon">
           <PanelsTopLeft size={19} aria-hidden="true" />
@@ -248,6 +392,7 @@ export function Controls(props: {
           {...common}
         />
       </div>
+      <BoardControls {...common} />
       <div className="auto-control">
         <ActionButton
           action="CLEAR_OVERRIDE"
@@ -274,6 +419,7 @@ export function Controls(props: {
                 <span className="command-name" title={c.action}>
                   {ACTION_LABEL[c.action]}
                   {c.value != null && ` ${c.value}°`}
+                  {c.text && ` “${c.text}”`}
                 </span>
                 <span className={`pill ${STATUS_CLASS[c.status]}`}>
                   {c.status}

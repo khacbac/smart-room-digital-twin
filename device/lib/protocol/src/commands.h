@@ -21,6 +21,12 @@ const char* rejectReasonName(RejectReason r);  // "INVALID_PAYLOAD" …, nullptr
 // A UUID is 36 chars; anything longer than this is treated as unparsable.
 const size_t kCommandIdMax = 64;
 
+// SHOW_MESSAGE `text`: printable ASCII, fits the 16x2 LCD (the backend strips accents).
+const size_t kMessageMax = 32;
+
+// What main.cpp shows on top of the engine's outputs after an executed command.
+enum class Effect : uint8_t { None, Identify, Message };
+
 struct CommandResult {
     bool ackable;    // false: invalid JSON or no string commandId → COMMAND_REJECTED event, no ack
     bool duplicate;  // QoS 1 redelivery: stored result re-acked, command not executed again
@@ -28,6 +34,8 @@ struct CommandResult {
     char commandId[kCommandIdMax + 1];
     AckStatus status;
     RejectReason reason;
+    Effect effect;                // set only when executed now
+    char text[kMessageMax + 1];  // Effect::Message
 };
 
 class CommandHandler {

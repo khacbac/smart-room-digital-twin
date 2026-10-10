@@ -22,6 +22,10 @@ function doneClause(locale: VoiceLocale, action: Action, value: number | null): 
       return vi(locale) ? "còi đã tắt" : "the alarm is off";
     case "CLEAR_OVERRIDE":
       return vi(locale) ? "phòng đã về chế độ tự động" : "the room is back on automatic control";
+    case "IDENTIFY":
+      return vi(locale) ? "mạch đang nháy đèn" : "the board is blinking";
+    case "SHOW_MESSAGE":
+      return vi(locale) ? "màn hình đã hiện chữ" : "the message is on the screen";
     default:
       return vi(locale) ? "thiết bị đã phản hồi" : "the device answered";
   }
@@ -35,6 +39,8 @@ function what(locale: VoiceLocale, action: Action): string {
     BUZZER_ON: "bật còi",
     BUZZER_OFF: "tắt còi",
     CLEAR_OVERRIDE: "trả về tự động",
+    IDENTIFY: "nháy đèn",
+    SHOW_MESSAGE: "hiển thị chữ",
   };
   const EN: Partial<Record<Action, string>> = {
     OPEN_WINDOW: "open the window",
@@ -42,6 +48,8 @@ function what(locale: VoiceLocale, action: Action): string {
     BUZZER_ON: "sound the alarm",
     BUZZER_OFF: "silence the alarm",
     CLEAR_OVERRIDE: "go back to automatic",
+    IDENTIFY: "blink the board",
+    SHOW_MESSAGE: "show the message",
   };
   return (vi(locale) ? VI : EN)[action] ?? action;
 }

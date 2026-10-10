@@ -231,6 +231,12 @@ function execute(cmd: CommandMessage) {
       break;
     case "PING":
       break;
+    case "IDENTIFY":
+      console.log(`[fake] *** IDENTIFY: ${deviceId} blinks its LEDs and beeps ***`);
+      break;
+    case "SHOW_MESSAGE":
+      console.log(`[fake] *** display: "${cmd.text}" ***`);
+      break;
   }
 }
 

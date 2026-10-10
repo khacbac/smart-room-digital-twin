@@ -92,7 +92,9 @@ export class RoomSim {
         this.buzzerOverride = null;
         break;
       case "PING":
-        break;
+      case "IDENTIFY":
+      case "SHOW_MESSAGE":
+        break; // display/LED effects only, the room state does not change
     }
   }
 

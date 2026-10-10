@@ -4,6 +4,8 @@ import { request } from "./client";
 export interface CommandBody {
   action: CommandAction;
   value?: number;
+  /** SHOW_MESSAGE only. */
+  text?: string;
   /** The contracts accept only "dashboard" (manual) and "ai" (voice) from clients. */
   source: "dashboard" | "ai";
 }

@@ -10,12 +10,22 @@ import {
 // anything itself: AssistantService checks the plan and creates the commands.
 
 /** Actions the assistant may use (PING is a diagnostic, not something a person asks for). */
-export const AssistantAction = z.enum(["OPEN_WINDOW", "CLOSE_WINDOW", "BUZZER_ON", "BUZZER_OFF", "CLEAR_OVERRIDE"]);
+export const AssistantAction = z.enum([
+  "OPEN_WINDOW",
+  "CLOSE_WINDOW",
+  "BUZZER_ON",
+  "BUZZER_OFF",
+  "CLEAR_OVERRIDE",
+  "IDENTIFY",
+  "SHOW_MESSAGE",
+]);
 export type AssistantAction = z.infer<typeof AssistantAction>;
 
 export const AssistantPlan = z.object({
   intent: AssistantIntent,
-  commands: z.array(z.object({ action: AssistantAction, value: z.number().nullable() })).max(2),
+  commands: z
+    .array(z.object({ action: AssistantAction, value: z.number().nullable(), text: z.string().nullish() }))
+    .max(2),
   reply: z.string().trim().min(1).max(400),
   /** The reply asks the user something, so the app should listen for the answer. */
   expectsAnswer: z.boolean().default(false),

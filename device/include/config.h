@@ -174,6 +174,9 @@
 #define BUTTON_DEBOUNCE_MS 50
 #define BUTTON_LONG_PRESS_MS 2000
 #define SYS_LOG_INTERVAL_MS 10000   // uptime + heap line on serial
+#define IDENTIFY_MS 3000            // IDENTIFY: LED chase + beeps + device id on the display
+#define MESSAGE_SHOW_MS 15000       // SHOW_MESSAGE: how long the text holds the display
+#define MESSAGE_CHIRP_MS 120        // short beep when a message arrives
 
 // ---- Sensor mapping (§4.6, Wokwi photoresistor module) ---------------------
 

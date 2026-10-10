@@ -73,6 +73,8 @@ export interface CommandRecord {
   deviceCode: string;
   action: CommandAction;
   value: number | null;
+  /** SHOW_MESSAGE text as sent to the device; absent on records from before it existed. */
+  text?: string | null;
   source: CommandSource;
   status: CommandStatus;
   reason: string | null;
