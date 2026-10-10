@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Smart Room Digital Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: technical report — sticky chapter index on the left, one reading column, figures scroll sideways on phones. */
+:root {
+  --bg: #F2F5F6;
+  --surface: #FFFFFF;
+  --fg: #13212A;
+  --muted: #566873;
+  --line: #D3DCE1;
+  --line-strong: #9AABB5;
+  --accent: #0A6C76;
+  --accent-soft: #DDEFF0;
+
+  --s-normal: #2F8A55;
+  --s-uncomf: #B8920F;
+  --s-warn: #D9731A;
+  --s-danger: #C4362C;
+
+  --l-biz: #E7E3F3;
+  --l-app: #DCEFF1;
+  --l-mid: #E3E9F6;
+  --l-net: #E0EDF8;
+  --l-edge: #FBEBD3;
+  --l-per: #E1F1E4;
+
+  --f-display: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E161B; --surface: #15212A; --fg: #E2EAEE; --muted: #93A5AF; --line: #273843; --line-strong: #4C606C;
+    --accent: #55C3CB; --accent-soft: #143A3F;
+    --s-normal: #4FBF7E; --s-uncomf: #E0BE3E; --s-warn: #F09A4A; --s-danger: #F06B5F;
+    --l-biz: #262236; --l-app: #16343A; --l-mid: #1D2740; --l-net: #172C3D; --l-edge: #3A2C17; --l-per: #19321F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E161B; --surface: #15212A; --fg: #E2EAEE; --muted: #93A5AF; --line: #273843; --line-strong: #4C606C;
+  --accent: #55C3CB; --accent-soft: #143A3F;
+  --s-normal: #4FBF7E; --s-uncomf: #E0BE3E; --s-warn: #F09A4A; --s-danger: #F06B5F;
+  --l-biz: #262236; --l-app: #16343A; --l-mid: #1D2740; --l-net: #172C3D; --l-edge: #3A2C17; --l-per: #19321F;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 17px; line-height: 1.65; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-inline: 16px; padding-block: 24px 64px; } }
+
+/* index */
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-family: var(--f-display); font-size: 13.5px; }
+.toc .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; margin-bottom: 4px; }
+.toc .sub { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: ch; }
+.toc a { display: grid; grid-template-columns: 22px 1fr; color: var(--muted); text-decoration: none; padding: 5px 8px; border-radius: 6px; }
+.toc a:hover, .toc a:focus-visible { color: var(--fg); background: var(--surface); outline: none; }
+.toc a span:first-child { font-family: var(--f-mono); font-size: 11.5px; padding-top: 2px; }
+@media (max-width: 900px) {
+  .toc { position: static; }
+  .toc ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+main { min-width: 0; max-width: 820px; }
+header.hero { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(34px, 5vw, 50px); line-height: 1.08; letter-spacing: -0.025em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { font-size: 19px; color: var(--fg); max-width: 64ch; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 18px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.meta b { color: var(--fg); font-weight: 500; }
+
+section.ch { padding-top: 48px; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: 28px; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; display: flex; gap: 14px; align-items: baseline; }
+h2 .n { font-family: var(--f-mono); font-weight: 400; font-size: 15px; color: var(--accent); }
+h3 { font-family: var(--f-display); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; margin: 32px 0 6px; text-wrap: balance; }
+h3 .n { font-family: var(--f-mono); font-weight: 400; font-size: 13px; color: var(--muted); margin-right: 8px; }
+p { margin: 10px 0; max-width: 68ch; }
+ul, ol.list { padding-left: 1.2em; margin: 10px 0; max-width: 68ch; }
+li { margin: 4px 0; }
+code, .mono { font-family: var(--f-mono); font-size: 0.84em; }
+code { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+strong { font-weight: 600; }
+.term { font-style: italic; }
+.chlede { color: var(--muted); font-size: 17px; margin-top: 4px; }
+
+/* tables */
+.tbl { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-family: var(--f-display); font-size: 14px; line-height: 1.45; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-weight: 600; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+td code { white-space: nowrap; }
+.num { font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 13px; }
+
+/* figures */
+figure { margin: 24px 0; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; overflow-x: auto; color: var(--fg); }
+.fig svg { display: block; width: 100%; min-width: 700px; height: auto; }
+.fig pre.mermaid { margin: 0; background: transparent; min-width: 600px; text-align: center; font-family: var(--f-display); }
+figcaption { font-family: var(--f-display); font-size: 13.5px; color: var(--muted); margin-top: 8px; max-width: 72ch; }
+figcaption b { color: var(--fg); font-weight: 600; }
+
+/* svg classes */
+.d-box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1; }
+.d-t { fill: var(--fg); font-family: var(--f-display); font-weight: 600; font-size: 13px; }
+.d-tl { fill: var(--fg); font-family: var(--f-display); font-weight: 700; font-size: 14px; }
+.d-s { fill: var(--muted); font-family: var(--f-mono); font-size: 11px; }
+.d-b { fill: var(--fg); font-family: var(--f-display); font-size: 12px; }
+.d-line { stroke: var(--line-strong); stroke-width: 1.5; fill: none; }
+.d-arrow { stroke: var(--fg); stroke-width: 1.4; fill: none; }
+.d-acc { stroke: var(--accent); stroke-width: 2; fill: none; }
+.d-acc-t { fill: var(--accent); font-family: var(--f-display); font-weight: 600; font-size: 12px; }
+.d-dash { stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+.d-head { fill: var(--fg); }
+.d-head-acc { fill: var(--accent); }
+.b-biz { fill: var(--l-biz); } .b-app { fill: var(--l-app); } .b-mid { fill: var(--l-mid); }
+.b-net { fill: var(--l-net); } .b-edge { fill: var(--l-edge); } .b-per { fill: var(--l-per); }
+.d-cross { fill: var(--bg); stroke: var(--line-strong); stroke-dasharray: 5 4; }
+.st-n { fill: color-mix(in srgb, var(--s-normal) 16%, var(--surface)); stroke: var(--s-normal); stroke-width: 1.5; }
+.st-u { fill: color-mix(in srgb, var(--s-uncomf) 18%, var(--surface)); stroke: var(--s-uncomf); stroke-width: 1.5; }
+.st-w { fill: color-mix(in srgb, var(--s-warn) 18%, var(--surface)); stroke: var(--s-warn); stroke-width: 1.5; }
+.st-d { fill: color-mix(in srgb, var(--s-danger) 18%, var(--surface)); stroke: var(--s-danger); stroke-width: 1.5; }
+.d-num { fill: var(--accent); }
+.d-num-t { fill: var(--surface); font-family: var(--f-mono); font-size: 12px; font-weight: 500; }
+.d-accbox { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+
+/* screenshot placeholders (phase 2) */
+.shot { border: 1.5px dashed var(--line-strong); border-radius: 10px; background: repeating-linear-gradient(135deg, transparent 0 12px, color-mix(in srgb, var(--line) 35%, transparent) 12px 13px), var(--surface); padding: 20px; display: grid; gap: 6px; align-content: center; min-height: 190px; font-family: var(--f-display); }
+.shot .tag { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.shot .what { font-weight: 600; font-size: 15px; }
+.shot .how { font-size: 13px; color: var(--muted); max-width: 60ch; }
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.shots .shot { min-height: 260px; }
+
+/* callouts and chips */
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; font-family: var(--f-display); font-size: 14.5px; max-width: 72ch; }
+.note p { margin: 4px 0; }
+.chip { display: inline-block; font-family: var(--f-mono); font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.c-n { color: var(--s-normal); } .c-u { color: var(--s-uncomf); } .c-w { color: var(--s-warn); } .c-d { color: var(--s-danger); }
+.layerdot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: 0; border: 1px solid var(--line-strong); }
+
+/* safety ladder */
+.ladder { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; max-width: 72ch; counter-reset: rung; font-family: var(--f-display); font-size: 14.5px; }
+.ladder li { counter-increment: rung; display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 0; }
+.ladder li::before { content: counter(rung); font-family: var(--f-mono); font-size: 13px; color: var(--surface); background: var(--fg); border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; }
+.ladder li:first-child::before { background: var(--s-danger); }
+
+/* confusion matrix */
+.cm td.cell { text-align: center; font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 16px 0; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-family: var(--f-display); }
+.kpi .v { font-family: var(--f-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.kpi .l { font-size: 12.5px; color: var(--muted); }
+
+.status-done { color: var(--s-normal); font-family: var(--f-mono); font-size: 12px; }
+.status-part { color: var(--s-uncomf); font-family: var(--f-mono); font-size: 12px; }
+.status-no { color: var(--s-danger); font-family: var(--f-mono); font-size: 12px; }
+
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); font-family: var(--f-display); font-size: 13px; color: var(--muted); }
+a { color: var(--accent); }
+/* illustrations: the artwork always has a light ground, so overlays keep fixed light-on-image colors */
+:root { --img-ground: #F2F5F6; --pin-bg: #0A6C76; --pin-fg: #FFFFFF; --pin-ring: rgba(255,255,255,0.92); --ov-bg: rgba(255,255,255,0.93); --ov-fg: #13212A; --ov-line: rgba(10,108,118,0.35); }
+.art { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--img-ground); }
+.art img { display: block; width: 100%; height: auto; }
+.hero-art { margin-top: 26px; }
+.pin { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; background: var(--pin-bg); color: var(--pin-fg); font-family: var(--f-mono); font-size: 12px; font-weight: 500; display: grid; place-items: center; box-shadow: 0 0 0 3px var(--pin-ring), 0 2px 8px rgba(0,0,0,0.25); }
+.ov { position: absolute; transform: translate(-50%, -50%); background: var(--ov-bg); color: var(--ov-fg); border: 1px solid var(--ov-line); border-radius: 999px; padding: 4px 11px; font-family: var(--f-display); font-size: 12.5px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.ov.mono { font-family: var(--f-mono); font-weight: 500; font-size: 11.5px; }
+@media (max-width: 600px) { .pin { width: 20px; height: 20px; font-size: 10px; } .ov { font-size: 10.5px; padding: 2px 7px; } .ov.mono { font-size: 9.5px; } }
+.legend { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; font-family: var(--f-display); font-size: 14px; max-width: none; }
+.legend li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: baseline; margin: 0; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.legend .k { font-family: var(--f-mono); font-size: 11px; color: var(--pin-fg); background: var(--pin-bg); border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; }
+.legend .p { font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
+.story { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; max-width: none; }
+@media (max-width: 760px) { .story { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.story li { margin: 0; display: grid; gap: 8px; align-content: start; font-family: var(--f-display); }
+.story .art { border-radius: 10px; }
+.story .step { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 14.5px; }
+.story .step span { font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--pin-fg); background: var(--pin-bg); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; flex: none; }
+.story p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<nav class="toc" aria-label="Mục lục">
+  <div class="brand">Smart Room Digital Twin</div>
+  <div class="sub">Báo cáo hệ thống IoT</div>
+  <ol>
+    <li><a href="#c1"><span>1</span><span>Giới thiệu</span></a></li>
+    <li><a href="#c2"><span>2</span><span>Tổng quan trực giác</span></a></li>
+    <li><a href="#c3"><span>3</span><span>Kiến trúc phân lớp</span></a></li>
+    <li><a href="#c4"><span>4</span><span>Thiết bị và Edge</span></a></li>
+    <li><a href="#c5"><span>5</span><span>Lớp mạng</span></a></li>
+    <li><a href="#c6"><span>6</span><span>Middleware</span></a></li>
+    <li><a href="#c7"><span>7</span><span>Ứng dụng và dịch vụ</span></a></li>
+    <li><a href="#c8"><span>8</span><span>Tin cậy và thực nghiệm</span></a></li>
+    <li><a href="#c9"><span>9</span><span>Hạn chế, hướng phát triển</span></a></li>
+    <li><a href="#pa"><span>A</span><span>Thuật ngữ</span></a></li>
+    <li><a href="#pb"><span>B</span><span>Kế hoạch hình ảnh</span></a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Báo cáo đồ án · Internet of Things</div>
+  <h1>Smart Room Digital Twin</h1>
+  <p class="lede">Một căn phòng tự cảm nhận nhiệt độ, độ ẩm, ánh sáng, chất lượng không khí và sự hiện diện của người. Phòng tự quyết định trạng thái an toàn ngay trên vi điều khiển và có một bản sao số chạy live trên web và điện thoại, điều khiển được bằng nút bấm hoặc giọng nói.</p>
+  <div class="meta">
+    <span>Thiết bị <b>ESP32-S3</b></span>
+    <span>Giao thức <b>MQTT · UART · SSE</b></span>
+    <span>Backend <b>Node.js / Fastify</b></span>
+    <span>Client <b>Next.js · Expo</b></span>
+    <span>Edge AI <b>TinyML int8</b></span>
+  </div>
+  <div class="art hero-art">
+    <img src="images/web/01-cover.jpg" width="1536" height="1024" alt="Minh hoạ căn phòng thông minh dạng isometric: bảng mạch ESP32 trên bàn, cảm biến trên tường, cửa sổ có servo; luồng dữ liệu đi từ bảng mạch lên cloud rồi tới điện thoại đang hiển thị bản sao của căn phòng.">
+  </div>
+</header>
+
+<!-- ============ 1 ============ -->
+<section class="ch" id="c1">
+  <h2><span class="n">01</span>Giới thiệu</h2>
+
+  <h3><span class="n">1.1</span>Bối cảnh và vấn đề</h3>
+  <p>Một phòng ở hoặc phòng làm việc có thể chuyển sang trạng thái không an toàn rất nhanh: nhiệt độ tăng, không khí ngột ngạt, khí độc tích tụ. Các giải pháp "nhà thông minh" phổ biến thường phụ thuộc hoàn toàn vào cloud. Khi mất Internet, thiết bị trở nên "mù", đúng vào lúc cần phản ứng nhất.</p>
+  <figure>
+    <div class="art">
+      <img src="images/web/05-edge-vs-cloud.jpg" width="1536" height="1024" loading="lazy" alt="Hai căn phòng cùng mất kết nối cloud. Phòng bên trái đầy khói đỏ, cửa đóng, không có gì phản ứng. Phòng bên phải có LED đỏ sáng, còi kêu và cửa sổ đã mở cho khí sạch vào.">
+      <span class="ov" style="left:25%;top:94%">Chỉ dựa vào cloud</span>
+      <span class="ov" style="left:75%;top:94%">Edge-first</span>
+    </div>
+    <figcaption><b>Hình 1.1.</b> Cùng một sự cố, cùng mất kết nối cloud. Phòng chỉ dựa vào cloud thì đứng yên; phòng edge-first tự bật cảnh báo và mở cửa thông gió.</figcaption>
+  </figure>
+  <p>Đồ án xây dựng một hệ thống IoT hoàn chỉnh cho một phòng, từ cảm biến tới ứng dụng, theo hướng <strong>edge-first</strong>: quyết định an toàn được đưa ra tại thiết bị, còn cloud đảm nhận quan sát, lưu trữ và chuyển lệnh của con người.</p>
+
+  <h3><span class="n">1.2</span>Mục tiêu</h3>
+  <ul>
+    <li>Thu thập dữ liệu môi trường theo thời gian thực: nhiệt độ, độ ẩm, ánh sáng, chất lượng không khí, chuyển động.</li>
+    <li>Phân loại trạng thái phòng thành 4 mức <span class="chip c-n">NORMAL</span> <span class="chip c-u">UNCOMFORTABLE</span> <span class="chip c-w">WARNING</span> <span class="chip c-d">DANGER</span> và tự điều khiển cửa sổ, còi, đèn báo ngay tại chỗ.</li>
+    <li>Truyền dữ liệu tin cậy qua MQTT và xây dựng <span class="term">digital twin</span> phản chiếu đúng trạng thái thiết bị báo lên.</li>
+    <li>Cho phép điều khiển hai chiều từ dashboard web, app Android và trợ lý giọng nói dùng LLM.</li>
+    <li>Thử nghiệm Edge AI: một mô hình TinyML chạy trên ESP32 thay rule cứng trong điều khiển thường ngày.</li>
+  </ul>
+
+  <h3><span class="n">1.3</span>Phạm vi</h3>
+  <p>Hệ thống giám sát <strong>một phòng</strong> (<code>room-01</code>). Thiết bị chạy trên trình mô phỏng <strong>Wokwi</strong> hoặc mạch thật, với hai phương án phần cứng: 1 mạch, hoặc 2 mạch (node cảm biến + gateway mạng). Dữ liệu lưu trong RAM hoặc trên Cloud Firestore. Xác thực người dùng và mã hoá TLS nằm ngoài phạm vi của phiên bản này (xem <a href="#c9">chương 9</a>).</p>
+
+  <h3><span class="n">1.4</span>Đóng góp chính</h3>
+  <ul>
+    <li>Kiến trúc phân lớp đầy đủ, mỗi lớp thay thế được độc lập nhờ một bộ <span class="term">contract</span> (schema) dùng chung.</li>
+    <li>Edge rule engine có <span class="term">hysteresis</span>, phát hiện lỗi cảm biến và cơ chế <span class="term">manual override</span> có thời hạn.</li>
+    <li>Giao thức link riêng giữa 2 vi điều khiển: frame COBS + CRC-16, tự đồng bộ lại sau nhiễu.</li>
+    <li>Mô hình TinyML 552 byte, dữ liệu huấn luyện do LLM gán nhãn theo một chính sách tiện nghi; rule engine vẫn giữ vai trò lớp an toàn cuối.</li>
+    <li>Trợ lý giọng nói tiếng Việt và tiếng Anh. Lệnh do AI tạo đi qua đúng các bước kiểm soát như lệnh của người.</li>
+  </ul>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="ch" id="c2">
+  <h2><span class="n">02</span>Tổng quan: góc nhìn trực giác</h2>
+  <p class="chlede">Trước khi vào thuật ngữ, cần nắm hai hình ảnh: bản sao số của căn phòng, và căn phòng như một cơ thể sống.</p>
+
+  <h3><span class="n">2.1</span>Digital twin là gì</h3>
+  <figure>
+    <div class="art">
+      <img src="images/web/03-digital-twin.jpg" width="1536" height="1024" loading="lazy" alt="Bên trái là căn phòng thật, bên phải là bản sao giống hệt dựng bằng khung lưới phát sáng màu teal. Hai luồng ánh sáng nối hai phòng theo hai chiều.">
+      <span class="ov" style="left:22%;top:8%">Phòng thật</span>
+      <span class="ov" style="left:76%;top:8%">Bản sao số (twin)</span>
+      <span class="ov mono" style="left:50%;top:34%">telemetry →</span>
+      <span class="ov mono" style="left:50%;top:60%">← command</span>
+    </div>
+    <figcaption><b>Hình 2.1.</b> Twin là một bản sao luôn khớp với phòng thật: góc cửa, đèn, còi, số đo. Dữ liệu đi từ phòng sang twin; lệnh đi ngược lại và chỉ được phản ánh lên twin sau khi phòng thật đã thực hiện.</figcaption>
+  </figure>
+
+  <h3><span class="n">2.2</span>Căn phòng như một cơ thể sống</h3>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Bộ phận cơ thể</th><th>Vai trò</th><th>Trong hệ thống</th></tr></thead>
+    <tbody>
+      <tr><td><span class="layerdot" style="background:var(--l-per)"></span>Giác quan</td><td>Cảm nhận môi trường</td><td>DHT22, LDR, cảm biến không khí, PIR, nút nhấn</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-edge)"></span>Phản xạ tuỷ sống</td><td>Phản ứng ngay, không chờ não</td><td>Edge rules + TinyML trên ESP32</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-per)"></span>Tay chân</td><td>Tác động lại môi trường</td><td>Servo cửa sổ, còi, 3 LED, màn hình LCD</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-net)"></span>Dây thần kinh</td><td>Truyền tín hiệu hai chiều</td><td>UART, Wi-Fi, MQTT</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-mid)"></span>Não bộ, trí nhớ</td><td>Ghi nhận, theo dõi, điều phối</td><td>Backend Fastify + Storage</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-app)"></span>Tấm gương</td><td>Phản chiếu cơ thể theo thời gian thực</td><td>Digital twin trên web và app</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-biz)"></span>Lời nói</td><td>Ra lệnh bằng ngôn ngữ tự nhiên</td><td>Trợ lý giọng nói (LLM)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3><span class="n">2.3</span>Một tình huống từ đầu đến cuối</h3>
+  <p>Bốn khung dưới đây kể lại một sự cố, đi qua mọi thành phần của hệ thống. Hình 2.3 tóm tắt cùng câu chuyện đó dưới dạng sơ đồ.</p>
+  <figure>
+    <ol class="story">
+      <li>
+        <div class="art"><img src="images/web/04a-story-hot.jpg" width="1254" height="1254" loading="lazy" alt="Căn phòng ám màu cam, có hơi nóng và khói mờ gần trần."></div>
+        <div class="step"><span>1</span>Phòng quá nóng</div>
+        <p>35 °C, không khí ngột ngạt (AQ 900). Cảm biến đo mỗi 1–2 s.</p>
+      </li>
+      <li>
+        <div class="art"><img src="images/web/04b-story-edge.jpg" width="1254" height="1254" loading="lazy" alt="LED đỏ sáng, còi phát sóng âm, cửa sổ mở hết và khí sạch tràn vào; router trong góc không có tín hiệu."></div>
+        <div class="step"><span>2</span>Thiết bị tự phản ứng</div>
+        <p>ESP32 chuyển DANGER: LED đỏ, còi, mở cửa 90°. Router mất mạng cũng không sao.</p>
+      </li>
+      <li>
+        <div class="art"><img src="images/web/04c-story-cloud.jpg" width="1254" height="1254" loading="lazy" alt="Các gói dữ liệu phát sáng đi từ bảng mạch qua router lên cụm máy chủ trong đám mây."></div>
+        <div class="step"><span>3</span>Dữ liệu lên hệ thống</div>
+        <p>Telemetry qua MQTT tới backend: kiểm tra, lưu, đẩy live qua SSE.</p>
+      </li>
+      <li>
+        <div class="art"><img src="images/web/04d-story-phone.jpg" width="1254" height="1254" loading="lazy" alt="Một người ngồi trên sofa nói vào điện thoại đang hiển thị bản sao căn phòng màu đỏ cảnh báo; một luồng sáng đi ra từ điện thoại."></div>
+        <div class="step"><span>4</span>Người dùng ra lệnh</div>
+        <p>Twin trên app chuyển đỏ. Người dùng nói "đóng cửa sổ", lệnh quay về thiết bị.</p>
+      </li>
+    </ol>
+    <figcaption><b>Hình 2.2.</b> Bước 2 diễn ra hoàn toàn trên thiết bị, trước khi bất kỳ dữ liệu nào lên cloud.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 300" role="img" aria-label="Vòng khép kín: phòng nóng, ESP32 tự chuyển DANGER và mở cửa, dữ liệu đi qua MQTT và backend tới app, người dùng ra lệnh đóng cửa, lệnh quay về thiết bị và được xác nhận bằng ack.">
+        <defs>
+          <marker id="h21" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="h21a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <!-- boxes -->
+        <rect class="d-box" x="10" y="40" width="205" height="140" rx="8"/>
+        <rect class="d-accbox" x="268" y="40" width="205" height="140" rx="8"/>
+        <rect class="d-box" x="526" y="40" width="205" height="140" rx="8"/>
+        <rect class="d-box" x="784" y="40" width="205" height="140" rx="8"/>
+        <!-- numbers -->
+        <circle class="d-num" cx="34" cy="64" r="12"/><text class="d-num-t" x="34" y="68" text-anchor="middle">1</text>
+        <circle class="d-num" cx="292" cy="64" r="12"/><text class="d-num-t" x="292" y="68" text-anchor="middle">2</text>
+        <circle class="d-num" cx="550" cy="64" r="12"/><text class="d-num-t" x="550" y="68" text-anchor="middle">3</text>
+        <circle class="d-num" cx="808" cy="64" r="12"/><text class="d-num-t" x="808" y="68" text-anchor="middle">4</text>
+        <!-- titles -->
+        <text class="d-tl" x="54" y="69">Căn phòng</text>
+        <text class="d-tl" x="312" y="69">ESP32 (edge)</text>
+        <text class="d-tl" x="570" y="69">MQTT → Backend</text>
+        <text class="d-tl" x="828" y="69">App / Dashboard</text>
+        <!-- body -->
+        <text class="d-s" x="26" y="104">35 °C · AQ 900</text>
+        <text class="d-b" x="26" y="128">nóng, không khí</text>
+        <text class="d-b" x="26" y="146">ngột ngạt</text>
+
+        <text class="d-s" x="284" y="104">→ DANGER</text>
+        <text class="d-b" x="284" y="128">mở cửa 90° · còi · LED đỏ</text>
+        <text class="d-acc-t" x="284" y="156">không cần Internet</text>
+
+        <text class="d-s" x="542" y="104">telemetry mỗi 2 s</text>
+        <text class="d-b" x="542" y="128">kiểm tra · lưu</text>
+        <text class="d-b" x="542" y="146">đẩy live qua SSE</text>
+
+        <text class="d-s" x="800" y="104">twin chuyển đỏ</text>
+        <text class="d-b" x="800" y="128">người dùng nói:</text>
+        <text class="d-b" x="800" y="146">“đóng cửa sổ lại”</text>
+        <!-- forward arrows -->
+        <line class="d-arrow" x1="215" y1="110" x2="266" y2="110" marker-end="url(#h21)"/>
+        <text class="d-s" x="241" y="100" text-anchor="middle">đo</text>
+        <line class="d-arrow" x1="473" y1="110" x2="524" y2="110" marker-end="url(#h21)"/>
+        <text class="d-s" x="499" y="100" text-anchor="middle">pub</text>
+        <line class="d-arrow" x1="731" y1="110" x2="782" y2="110" marker-end="url(#h21)"/>
+        <text class="d-s" x="757" y="100" text-anchor="middle">SSE</text>
+        <!-- return loop -->
+        <polyline class="d-acc" points="886,180 886,236 370,236 370,182" marker-end="url(#h21a)"/>
+        <text class="d-acc-t" x="628" y="262" text-anchor="middle">command (QoS 1) → thiết bị thực thi → ack → twin mới cập nhật</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 2.3.</b> Một vòng khép kín. Bước 2 diễn ra hoàn toàn trên thiết bị nên phòng vẫn tự bảo vệ khi mất mạng. Ở chiều ngược lại, giao diện chỉ đổi khi thiết bị đã xác nhận (ack), không đổi theo kiểu "đoán trước".</figcaption>
+  </figure>
+
+  <div class="note">
+    <p><strong>Ý tưởng cốt lõi:</strong> thiết bị tự quyết định (edge-first), cloud quan sát, lưu trữ và chuyển lệnh. Digital twin chỉ phản chiếu sự thật do thiết bị báo lên, không bao giờ tự giả định.</p>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="ch" id="c3">
+  <h2><span class="n">03</span>Kiến trúc phân lớp</h2>
+  <p class="chlede">Hệ thống được tổ chức theo mô hình kiến trúc IoT nhiều lớp, có thêm một lớp Edge Computing nằm giữa thiết bị và mạng.</p>
+
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 640" role="img" aria-label="Kiến trúc 6 lớp: Perception, Edge Computing, Network, Middleware, Application, Business. Dữ liệu đi lên dưới dạng telemetry, status, event, ack; lệnh đi xuống qua command QoS 1.">
+        <defs>
+          <marker id="h31" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="h31a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- L5 Business y=20 -->
+        <rect class="b-biz" x="0" y="20" width="150" height="80" rx="6"/>
+        <text class="d-s" x="14" y="50">L5 · DỊCH VỤ</text><text class="d-tl" x="14" y="74">Business</text>
+        <rect class="b-biz" x="160" y="20" width="740" height="80" rx="6" opacity="0.55"/>
+        <rect class="d-box" x="172" y="32" width="230" height="56" rx="5"/><text class="d-t" x="287" y="56" text-anchor="middle">Scenes</text><text class="d-s" x="287" y="74" text-anchor="middle">Welcome · Ventilate · Night</text>
+        <rect class="d-box" x="415" y="32" width="230" height="56" rx="5"/><text class="d-t" x="530" y="56" text-anchor="middle">Giám sát an toàn</text><text class="d-s" x="530" y="74" text-anchor="middle">4 mức · cảnh báo · lịch sử</text>
+        <rect class="d-box" x="658" y="32" width="230" height="56" rx="5"/><text class="d-t" x="773" y="56" text-anchor="middle">Điều khiển giọng nói</text><text class="d-s" x="773" y="74" text-anchor="middle">vi-VN · en-US</text>
+
+        <!-- L4 Application y=112 -->
+        <rect class="b-app" x="0" y="112" width="150" height="80" rx="6"/>
+        <text class="d-s" x="14" y="142">L4 · ỨNG DỤNG</text><text class="d-tl" x="14" y="166">Application</text>
+        <rect class="b-app" x="160" y="112" width="740" height="80" rx="6" opacity="0.55"/>
+        <rect class="d-box" x="172" y="124" width="230" height="56" rx="5"/><text class="d-t" x="287" y="148" text-anchor="middle">Dashboard web</text><text class="d-s" x="287" y="166" text-anchor="middle">Next.js · :3100</text>
+        <rect class="d-box" x="415" y="124" width="230" height="56" rx="5"/><text class="d-t" x="530" y="148" text-anchor="middle">App Android</text><text class="d-s" x="530" y="166" text-anchor="middle">Expo · React Native</text>
+        <rect class="d-box" x="658" y="124" width="230" height="56" rx="5"/><text class="d-t" x="773" y="148" text-anchor="middle">Digital twin view</text><text class="d-s" x="773" y="166" text-anchor="middle">twin-core reducer · SVG</text>
+
+        <!-- L3 Middleware y=204 -->
+        <rect class="b-mid" x="0" y="204" width="150" height="80" rx="6"/>
+        <text class="d-s" x="14" y="234">L3 · XỬ LÝ</text><text class="d-tl" x="14" y="258">Middleware</text>
+        <rect class="b-mid" x="160" y="204" width="740" height="80" rx="6" opacity="0.55"/>
+        <rect class="d-box" x="172" y="216" width="109" height="56" rx="5"/><text class="d-t" x="226.5" y="240" text-anchor="middle">Ingest</text><text class="d-s" x="226.5" y="258" text-anchor="middle">Zod · dedup</text>
+        <rect class="d-box" x="293" y="216" width="109" height="56" rx="5"/><text class="d-t" x="347.5" y="240" text-anchor="middle">Presence</text><text class="d-s" x="347.5" y="258" text-anchor="middle">LWT · 45 s</text>
+        <rect class="d-box" x="414" y="216" width="109" height="56" rx="5"/><text class="d-t" x="468.5" y="240" text-anchor="middle">Commands</text><text class="d-s" x="468.5" y="258" text-anchor="middle">ack · timeout</text>
+        <rect class="d-box" x="535" y="216" width="109" height="56" rx="5"/><text class="d-t" x="589.5" y="240" text-anchor="middle">Realtime</text><text class="d-s" x="589.5" y="258" text-anchor="middle">SSE · REST</text>
+        <rect class="d-box" x="656" y="216" width="109" height="56" rx="5"/><text class="d-t" x="710.5" y="240" text-anchor="middle">Storage</text><text class="d-s" x="710.5" y="258" text-anchor="middle">RAM | Firestore</text>
+        <rect class="d-box" x="777" y="216" width="109" height="56" rx="5"/><text class="d-t" x="831.5" y="240" text-anchor="middle">AI assistant</text><text class="d-s" x="831.5" y="258" text-anchor="middle">Gemini | Claude</text>
+
+        <!-- L2 Network y=296 -->
+        <rect class="b-net" x="0" y="296" width="150" height="80" rx="6"/>
+        <text class="d-s" x="14" y="326">L2 · TRUYỀN THÔNG</text><text class="d-tl" x="14" y="350">Network</text>
+        <rect class="b-net" x="160" y="296" width="740" height="80" rx="6" opacity="0.55"/>
+        <rect class="d-box" x="172" y="308" width="230" height="56" rx="5"/><text class="d-t" x="287" y="332" text-anchor="middle">MQTT broker</text><text class="d-s" x="287" y="350" text-anchor="middle">Mosquitto :1883 · QoS · LWT</text>
+        <rect class="d-box" x="415" y="308" width="230" height="56" rx="5"/><text class="d-t" x="530" y="332" text-anchor="middle">Wi-Fi + NTP</text><text class="d-s" x="530" y="350" text-anchor="middle">trên gateway / mạch đơn</text>
+        <rect class="d-box" x="658" y="308" width="230" height="56" rx="5"/><text class="d-t" x="773" y="332" text-anchor="middle">Link UART</text><text class="d-s" x="773" y="350" text-anchor="middle">115200 · COBS · CRC-16</text>
+
+        <!-- L1.5 Edge y=388 -->
+        <rect class="b-edge" x="0" y="388" width="150" height="80" rx="6" stroke="var(--s-warn)" stroke-width="1.5"/>
+        <text class="d-s" x="14" y="418">L1.5 · BIÊN</text><text class="d-tl" x="14" y="442">Edge</text>
+        <rect class="b-edge" x="160" y="388" width="740" height="80" rx="6" opacity="0.7"/>
+        <rect class="d-box" x="172" y="400" width="230" height="56" rx="5"/><text class="d-t" x="287" y="424" text-anchor="middle">Edge rules</text><text class="d-s" x="287" y="442" text-anchor="middle">4 mức · hysteresis</text>
+        <rect class="d-box" x="415" y="400" width="230" height="56" rx="5"/><text class="d-t" x="530" y="424" text-anchor="middle">TinyML int8</text><text class="d-s" x="530" y="442" text-anchor="middle">5→24→12→12 · 552 B</text>
+        <rect class="d-box" x="658" y="400" width="230" height="56" rx="5"/><text class="d-t" x="773" y="424" text-anchor="middle">Manual override</text><text class="d-s" x="773" y="442" text-anchor="middle">lệnh tay thắng 120 s</text>
+
+        <!-- L1 Perception y=480 -->
+        <rect class="b-per" x="0" y="480" width="150" height="80" rx="6"/>
+        <text class="d-s" x="14" y="510">L1 · CẢM NHẬN</text><text class="d-tl" x="14" y="534">Perception</text>
+        <rect class="b-per" x="160" y="480" width="740" height="80" rx="6" opacity="0.55"/>
+        <rect class="d-box" x="172" y="492" width="230" height="56" rx="5"/><text class="d-t" x="287" y="516" text-anchor="middle">Cảm biến</text><text class="d-s" x="287" y="534" text-anchor="middle">DHT22 · LDR · AQ · PIR</text>
+        <rect class="d-box" x="415" y="492" width="230" height="56" rx="5"/><text class="d-t" x="530" y="516" text-anchor="middle">ESP32-S3</text><text class="d-s" x="530" y="534" text-anchor="middle">FreeRTOS · 2 nhân</text>
+        <rect class="d-box" x="658" y="492" width="230" height="56" rx="5"/><text class="d-t" x="773" y="516" text-anchor="middle">Cơ cấu chấp hành</text><text class="d-s" x="773" y="534" text-anchor="middle">servo · còi · LED · LCD</text>
+
+        <!-- cross-cutting -->
+        <rect class="d-cross" x="0" y="578" width="900" height="44" rx="6"/>
+        <text class="d-b" x="450" y="605" text-anchor="middle">Xuyên suốt: @srdt/contracts (Zod schema) · @srdt/twin-core · Wokwi + fake-device · test native / Vitest</text>
+
+        <!-- up / down -->
+        <line class="d-arrow" x1="938" y1="556" x2="938" y2="122" marker-end="url(#h31)"/>
+        <text class="d-s" transform="translate(926 340) rotate(-90)" text-anchor="middle">uplink: telemetry · status · event · ack</text>
+        <line class="d-acc" x1="982" y1="122" x2="982" y2="556" marker-end="url(#h31a)"/>
+        <text class="d-acc-t" transform="translate(970 340) rotate(-90)" text-anchor="middle">downlink: command (QoS 1)</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 3.1.</b> Sáu lớp và các thành phần chính của từng lớp. Lớp Edge (viền cam) là điểm khác biệt của hệ thống: quyết định an toàn được đưa ra ở đây, không phải trên server. Dữ liệu đi lên bên trái, lệnh đi xuống bên phải.</figcaption>
+  </figure>
+
+  <h3><span class="n">3.1</span>Ánh xạ lớp → mã nguồn → công nghệ</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Lớp</th><th>Thư mục</th><th>Công nghệ</th><th>Trách nhiệm</th></tr></thead>
+    <tbody>
+      <tr><td><span class="layerdot" style="background:var(--l-per)"></span>Perception</td><td><code>device/src</code></td><td>C++, PlatformIO, Arduino core 2.x</td><td>Đọc cảm biến, điều khiển chân I/O</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-edge)"></span>Edge</td><td><code>device/lib/edge_rules</code>, <code>edge_ai</code>, <code>ml/</code></td><td>C++ thuần, PyTorch (huấn luyện)</td><td>Phân loại trạng thái, quyết định actuator</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-net)"></span>Network</td><td><code>device/lib/link</code>, <code>broker/</code></td><td>UART, Wi-Fi, MQTT 3.1.1, Mosquitto</td><td>Vận chuyển message hai chiều</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-mid)"></span>Middleware</td><td><code>server/</code>, <code>cloud/</code></td><td>Node.js 24, Fastify, mqtt.js, Firestore</td><td>Kiểm tra, lưu, presence, vòng đời lệnh, realtime</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-app)"></span>Application</td><td><code>dashboard/</code>, <code>mobile/</code></td><td>Next.js 16, Expo SDK 55, React Native</td><td>Hiển thị twin, biểu đồ, điều khiển, giọng nói</td></tr>
+      <tr><td><span class="layerdot" style="background:var(--l-biz)"></span>Business</td><td><code>packages/twin-core</code></td><td>TypeScript</td><td>Scenes, luật xung đột lệnh, ngưỡng hiển thị</td></tr>
+      <tr><td>Xuyên suốt</td><td><code>packages/contracts</code></td><td>TypeScript + Zod</td><td>Schema chung cho mọi message (single source of truth)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3><span class="n">3.2</span>Năm nguyên tắc thiết kế</h3>
+  <ul>
+    <li><strong>Edge-first, local autonomy.</strong> Backend không bao giờ trực tiếp điều khiển actuator theo luật. Các luật phía server chỉ quét offline và quét timeout lệnh.</li>
+    <li><strong>Contract-driven.</strong> Firmware, backend và client dùng cùng một định nghĩa message. Đổi schema chỉ sửa ở một chỗ.</li>
+    <li><strong>Reported state.</strong> Twin = trạng thái thiết bị báo lên gần nhất + telemetry mới nhất. Không có <span class="term">optimistic update</span>.</li>
+    <li><strong>Loose coupling.</strong> Pub/sub giữa thiết bị và backend; storage và transport của link đều là interface thay được.</li>
+    <li><strong>Simulation-first.</strong> Phần nào cũng có bản giả, nên từng người phát triển độc lập mà không cần đủ phần cứng.</li>
+  </ul>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="ch" id="c4">
+  <h2><span class="n">04</span>Lớp thiết bị và Edge Computing</h2>
+  <p class="chlede">Lớp Perception đo và tác động lên phòng; lớp Edge biến số đo thành quyết định.</p>
+
+  <h3><span class="n">4.1</span>Phần cứng</h3>
+  <figure>
+    <div class="art">
+      <img src="images/web/02-room-anatomy.jpg" width="1536" height="1024" loading="lazy" alt="Căn phòng isometric với các linh kiện: cảm biến nhiệt độ độ ẩm và cảm biến khí trên tường trái, cảm biến chuyển động gần trần, cảm biến ánh sáng trên tường phải, servo trên cửa sổ, bảng mạch ESP32, màn hình LCD, ba LED và còi trên bàn.">
+      <span class="pin" style="left:19.2%;top:21.5%">1</span>
+      <span class="pin" style="left:28.6%;top:18.5%">2</span>
+      <span class="pin" style="left:33.3%;top:8.5%">3</span>
+      <span class="pin" style="left:80.6%;top:25%">4</span>
+      <span class="pin" style="left:66.4%;top:13.5%">5</span>
+      <span class="pin" style="left:49.8%;top:35%">6</span>
+      <span class="pin" style="left:60.9%;top:45%">7</span>
+      <span class="pin" style="left:70.3%;top:48%">8</span>
+      <span class="pin" style="left:77.5%;top:52%">9</span>
+    </div>
+    <ul class="legend">
+      <li><span class="k">1</span>DHT22 nhiệt độ, độ ẩm<span class="p">GPIO15</span></li>
+      <li><span class="k">2</span>Cảm biến khí<span class="p">GPIO2</span></li>
+      <li><span class="k">3</span>PIR chuyển động<span class="p">GPIO16</span></li>
+      <li><span class="k">4</span>LDR ánh sáng<span class="p">GPIO1</span></li>
+      <li><span class="k">5</span>Servo cửa sổ<span class="p">GPIO18</span></li>
+      <li><span class="k">6</span>ESP32-S3<span class="p">MCU</span></li>
+      <li><span class="k">7</span>LCD 1602 I2C<span class="p">GPIO8/9</span></li>
+      <li><span class="k">8</span>LED xanh / vàng / đỏ<span class="p">GPIO38–40</span></li>
+      <li><span class="k">9</span>Buzzer<span class="p">GPIO21</span></li>
+    </ul>
+    <figcaption><b>Hình 4.1.</b> Vị trí các linh kiện trong phòng. Cảm biến (1–4) là "giác quan", ESP32 (6) là nơi ra quyết định, còn 5, 7, 8, 9 là cơ cấu chấp hành.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Linh kiện</th><th>Chân</th><th>Đại lượng / vai trò</th></tr></thead>
+    <tbody>
+      <tr><td>DHT22</td><td class="num">GPIO15</td><td>Nhiệt độ (−40…80 °C), độ ẩm (0…100 %), đọc mỗi 2 s</td></tr>
+      <tr><td>Module LDR</td><td class="num">GPIO1 (ADC1)</td><td>Ánh sáng, quy đổi ra lux</td></tr>
+      <tr><td>Biến trở / MQ-135</td><td class="num">GPIO2 (ADC1)</td><td>Chỉ số chất lượng không khí 0…1000</td></tr>
+      <tr><td>PIR</td><td class="num">GPIO16</td><td>Có người / không</td></tr>
+      <tr><td>Nút nhấn</td><td class="num">GPIO17</td><td>Nhấn ngắn / nhấn giữ 2 s: override tại chỗ</td></tr>
+      <tr><td>Servo</td><td class="num">GPIO18</td><td>Cửa sổ 0° (đóng) … 90° (mở hết)</td></tr>
+      <tr><td>Buzzer</td><td class="num">GPIO21</td><td>Còi PWM 2 kHz, nhịp 500 ms</td></tr>
+      <tr><td>LED xanh / vàng / đỏ</td><td class="num">GPIO38/39/40</td><td>Hiển thị trạng thái</td></tr>
+      <tr><td>LCD 1602 I2C</td><td class="num">SDA 8 · SCL 9</td><td>Số đo, trạng thái, thông điệp</td></tr>
+    </tbody>
+  </table></div>
+  <p>Chân analog dùng ADC1 vì ADC2 của ESP32 không dùng được khi Wi-Fi đang bật. Firmware còn có bản cho bộ kit ESP32 phổ thông (DHT11, OLED, relay thay servo).</p>
+
+  <figure>
+    <div class="shot">
+      <div class="tag">Ảnh chụp · Phase 2</div>
+      <div class="what">Ảnh 4.1 — Mạch 1 board trên Wokwi ở trạng thái DANGER</div>
+      <div class="how">Chạy <code>env:esp32-s3</code> trong Wokwi, kéo nhiệt độ DHT22 lên 35 °C. Chụp khi LED đỏ sáng, servo mở 90° và LCD hiện "DANGER".</div>
+    </div>
+    <figcaption><b>Ảnh 4.1.</b> Mạch mô phỏng với đầy đủ cảm biến và cơ cấu chấp hành.</figcaption>
+  </figure>
+
+  <h3><span class="n">4.2</span>Tổ chức firmware</h3>
+  <p>ESP32-S3 có 2 nhân. Firmware chạy trên FreeRTOS và tách việc theo nhân: <strong>nhân 1</strong> chạy vòng lặp chính (cảm biến → rule → actuator), <strong>nhân 0</strong> chạy tác vụ mạng (Wi-Fi, NTP, MQTT). Hai bên trao đổi qua hàng đợi FreeRTOS, nên kết nối mạng chậm hay rớt cũng không làm trễ phản ứng an toàn.</p>
+  <p>Phần logic (<code>edge_rules</code>, <code>protocol</code>, <code>link</code>, <code>edge_ai</code>) viết bằng C++ thuần, không phụ thuộc Arduino, nên chạy được unit test ngay trên PC (<code>pio test -e native</code>).</p>
+
+  <h3><span class="n">4.3</span>Edge rule engine</h3>
+  <p>Mỗi giây, rule engine thực hiện ba bước:</p>
+  <ol class="list">
+    <li><strong>Tiền xử lý tín hiệu:</strong> loại giá trị ngoài miền hợp lệ, làm mượt bằng trung bình trượt 3 mẫu. DHT22 hỏng liên tục quá 10 s thì phát sự kiện <code>SENSOR_FAULT</code>.</li>
+    <li><strong>Cập nhật state machine</strong> 4 mức (Hình 4.2).</li>
+    <li><strong>Sinh tín hiệu ra</strong> cho LED, còi và góc servo.</li>
+  </ol>
+
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 300" role="img" aria-label="State machine 4 mức. Leo thang ngay lập tức khi bất kỳ ngưỡng vào nào đạt, có thể nhảy cóc. Hạ từng bậc khi mọi điều kiện ra thoả và đã giữ mức ít nhất 5 giây.">
+        <defs>
+          <marker id="h41" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <!-- escalation bus -->
+        <polyline class="d-arrow" points="120,100 120,62 880,62 880,98" marker-end="url(#h41)"/>
+        <line class="d-arrow" x1="373" y1="62" x2="373" y2="98" marker-end="url(#h41)"/>
+        <line class="d-arrow" x1="626" y1="62" x2="626" y2="98" marker-end="url(#h41)"/>
+        <text class="d-b" x="500" y="46" text-anchor="middle">leo thang ngay khi BẤT KỲ ngưỡng vào nào đạt (có thể nhảy cóc)</text>
+
+        <rect class="st-n" x="20" y="100" width="200" height="96" rx="8"/>
+        <rect class="st-u" x="273" y="100" width="200" height="96" rx="8"/>
+        <rect class="st-w" x="526" y="100" width="200" height="96" rx="8"/>
+        <rect class="st-d" x="780" y="100" width="200" height="96" rx="8"/>
+
+        <text class="d-tl" x="120" y="128" text-anchor="middle">NORMAL</text>
+        <text class="d-b" x="120" y="152" text-anchor="middle">LED xanh</text>
+        <text class="d-s" x="120" y="174" text-anchor="middle">cửa đóng 0°</text>
+
+        <text class="d-tl" x="373" y="128" text-anchor="middle">UNCOMFORTABLE</text>
+        <text class="d-b" x="373" y="152" text-anchor="middle">LED vàng sáng</text>
+        <text class="d-s" x="373" y="174" text-anchor="middle">giữ góc cửa hiện tại</text>
+
+        <text class="d-tl" x="626" y="128" text-anchor="middle">WARNING</text>
+        <text class="d-b" x="626" y="152" text-anchor="middle">LED vàng nháy 2 Hz</text>
+        <text class="d-s" x="626" y="174" text-anchor="middle">giữ góc cửa hiện tại</text>
+
+        <text class="d-tl" x="880" y="128" text-anchor="middle">DANGER</text>
+        <text class="d-b" x="880" y="152" text-anchor="middle">LED đỏ · còi 500 ms</text>
+        <text class="d-s" x="880" y="174" text-anchor="middle">mở cửa 90°</text>
+
+        <!-- step down -->
+        <polyline class="d-arrow" points="313,196 313,232 180,232 180,198" marker-end="url(#h41)"/>
+        <polyline class="d-arrow" points="566,196 566,232 433,232 433,198" marker-end="url(#h41)"/>
+        <polyline class="d-arrow" points="820,196 820,232 686,232 686,198" marker-end="url(#h41)"/>
+        <text class="d-b" x="500" y="270" text-anchor="middle">hạ từng bậc khi MỌI điều kiện ra thoả và đã giữ mức ≥ 5 s</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 4.2.</b> State machine có hysteresis: lên nhanh, xuống chậm. Ngưỡng ra thấp hơn ngưỡng vào nên trạng thái không nhảy qua lại khi số đo dao động quanh ngưỡng.</figcaption>
+  </figure>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Mức</th><th>Nhiệt độ vào / ra</th><th>Chất lượng KK vào / ra</th><th>Độ ẩm vào / ra</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip c-u">UNCOMFORTABLE</span></td><td class="num">≥ 29.0 / &lt; 28.5 °C</td><td class="num">≥ 500 / &lt; 470</td><td class="num">≥ 75 / &lt; 72 %</td></tr>
+      <tr><td><span class="chip c-w">WARNING</span></td><td class="num">≥ 31.0 / &lt; 30.0 °C</td><td class="num">≥ 700 / &lt; 650</td><td class="num">—</td></tr>
+      <tr><td><span class="chip c-d">DANGER</span></td><td class="num">≥ 34.0 / &lt; 33.0 °C</td><td class="num">≥ 900 / &lt; 850</td><td class="num">—</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><strong>Manual override.</strong> Khi người dùng mở/đóng cửa hoặc bật/tắt còi (từ app, dashboard, AI hay nút trên mạch), lệnh đó thắng rule engine trong <strong>120 s</strong>, sau đó quyền điều khiển trở về edge. Override tự huỷ nếu phòng leo thang lên mức cao hơn mức lúc đặt override. LED, sự kiện và trạng thái vẫn cập nhật bình thường trong lúc override.</p>
+
+  <h3><span class="n">4.4</span>TinyML: mô hình điều khiển trên vi điều khiển</h3>
+  <p>Rule engine dùng ngưỡng cứng và không biết ngữ cảnh: phòng trống hay có người, ngày hay đêm, nóng kèm ẩm. Hệ thống bổ sung một mạng nơ-ron nhỏ chạy trực tiếp trên ESP32, đảm nhận điều khiển thường ngày.</p>
+
+  <figure>
+    <div class="fig">
+<pre class="mermaid">
+flowchart LR
+  P["ml/policy.md<br/>chính sách tiện nghi"] --> G["LLM Gemini<br/>gán nhãn kịch bản"]
+  G --> D[("8 188 mẫu<br/>gemini + offline")]
+  D --> T["train.py<br/>PyTorch MLP 5→24→12→12"]
+  T --> Q["lượng tử hoá int8<br/>552 B trọng số"]
+  Q --> F["model_data.h<br/>firmware ESP32"]
+  Q --> J["model.json<br/>fake-device (TS)"]
+</pre>
+    </div>
+    <figcaption><b>Hình 4.3.</b> Pipeline huấn luyện. LLM đóng vai "chuyên gia gán nhãn" theo một chính sách viết sẵn. Cùng một bộ trọng số được xuất cho firmware C++ và bản TypeScript, và có test kiểm tra hai bản cho kết quả giống nhau (parity test).</figcaption>
+  </figure>
+
+  <p><strong>Đầu vào</strong> (5 giá trị đã làm mượt): nhiệt độ, độ ẩm, chất lượng không khí, log ánh sáng, có người. <strong>Đầu ra</strong>: trạng thái (4 lớp), góc cửa (một trong 0/20/30/45/60/70/90°), bật còi hay không. Mỗi lần suy luận chỉ khoảng 300 phép nhân-cộng.</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">96.7%</div><div class="l">State accuracy (int8)</div></div>
+    <div class="kpi"><div class="v">0.965</div><div class="l">Macro F1</div></div>
+    <div class="kpi"><div class="v">1.65°</div><div class="l">Sai số góc cửa (MAE)</div></div>
+    <div class="kpi"><div class="v">99.1%</div><div class="l">Buzzer accuracy</div></div>
+  </div>
+
+  <div class="tbl"><table class="cm">
+    <thead><tr><th>Nhãn \ Dự đoán</th><th>NORMAL</th><th>UNCOMF.</th><th>WARNING</th><th>DANGER</th></tr></thead>
+    <tbody>
+      <tr><td>NORMAL</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 38%,transparent)">148</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 6%,transparent)">7</td><td class="cell">0</td><td class="cell">0</td></tr>
+      <tr><td>UNCOMFORTABLE</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 6%,transparent)">8</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 60%,transparent)">389</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 6%,transparent)">7</td><td class="cell">0</td></tr>
+      <tr><td>WARNING</td><td class="cell">0</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 5%,transparent)">4</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 58%,transparent)">368</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 4%,transparent)">2</td></tr>
+      <tr><td>DANGER</td><td class="cell">0</td><td class="cell">0</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 9%,transparent)">13</td><td class="cell" style="background:color-mix(in srgb,var(--accent) 52%,transparent)">286</td></tr>
+    </tbody>
+  </table></div>
+  <p>Ma trận nhầm lẫn trên tập test 1 232 mẫu. Lỗi chỉ xuất hiện giữa các mức liền kề; không có mẫu NORMAL nào bị đoán thành DANGER hay ngược lại. Mô hình chỉ khớp với rule engine khoảng 86 %. Đây là chủ ý, vì chính sách gán nhãn có thêm ngữ cảnh mà rule không có. Ví dụ: có người thì thông gió sớm từ AQ 380, ban đêm thì giới hạn cửa ở 30°, phòng lạnh dưới 18 °C thì đóng cửa.</p>
+
+  <h3><span class="n">4.5</span>Thứ bậc an toàn</h3>
+  <p>Khi nhiều nguồn cùng muốn điều khiển cửa sổ và còi, firmware phân xử theo thứ tự cố định sau:</p>
+  <ol class="ladder">
+    <li><div><strong>Rule engine báo DANGER</strong> → cửa 90°, còi bật, bất kể mô hình nói gì (<span class="term">safety floor</span>).</div></li>
+    <li><div><strong>Manual override</strong> trong 120 s, từ người dùng hoặc trợ lý AI.</div></li>
+    <li><div><strong>TinyML</strong> điều khiển thường ngày khi có đủ đầu vào hợp lệ.</div></li>
+    <li><div><strong>Rule engine</strong> khi mô hình bị tắt hoặc cảm biến DHT lỗi.</div></li>
+  </ol>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="ch" id="c5">
+  <h2><span class="n">05</span>Lớp mạng và truyền thông</h2>
+  <p class="chlede">Có hai chặng truyền: giữa hai vi điều khiển (UART), và từ thiết bị lên hệ thống (MQTT).</p>
+
+  <h3><span class="n">5.1</span>Hai phương án triển khai thiết bị</h3>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 310" role="img" aria-label="So sánh: phương án A một mạch ESP32 làm mọi việc và nối thẳng MQTT; phương án B tách node cảm biến và gateway mạng, thêm chặng UART. Cả hai đều publish cùng topic tới cùng broker.">
+        <defs>
+          <marker id="h51" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="h51a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <text class="d-tl" x="10" y="84">A · 1 mạch</text>
+        <text class="d-tl" x="10" y="232">B · 2 mạch</text>
+
+        <rect class="d-box" x="140" y="40" width="420" height="76" rx="8"/>
+        <text class="d-t" x="350" y="70" text-anchor="middle">ESP32-S3</text>
+        <text class="d-s" x="350" y="92" text-anchor="middle">cảm biến + edge rules + Wi-Fi/MQTT</text>
+
+        <rect class="d-box" x="140" y="186" width="220" height="90" rx="8"/>
+        <text class="d-t" x="250" y="216" text-anchor="middle">Node</text>
+        <text class="d-s" x="250" y="238" text-anchor="middle">cảm biến + edge rules</text>
+        <text class="d-s" x="250" y="256" text-anchor="middle">không có Wi-Fi</text>
+
+        <rect class="d-box" x="500" y="186" width="200" height="90" rx="8"/>
+        <text class="d-t" x="600" y="216" text-anchor="middle">Gateway</text>
+        <text class="d-s" x="600" y="238" text-anchor="middle">Wi-Fi · NTP · MQTT</text>
+        <text class="d-s" x="600" y="256" text-anchor="middle">LED RGB trạng thái</text>
+
+        <line class="d-acc" x1="362" y1="231" x2="498" y2="231" marker-start="url(#h51a)" marker-end="url(#h51a)"/>
+        <text class="d-acc-t" x="430" y="220" text-anchor="middle">UART 115200</text>
+        <text class="d-acc-t" x="430" y="252" text-anchor="middle">COBS + CRC-16</text>
+
+        <rect class="d-box" x="790" y="40" width="200" height="236" rx="8"/>
+        <text class="d-t" x="890" y="140" text-anchor="middle">Mosquitto :1883</text>
+        <text class="d-s" x="890" y="162" text-anchor="middle">srdt/room-01/…</text>
+        <text class="d-s" x="890" y="184" text-anchor="middle">backend không đổi</text>
+
+        <line class="d-arrow" x1="560" y1="78" x2="788" y2="78" marker-end="url(#h51)"/>
+        <text class="d-s" x="674" y="68" text-anchor="middle">Wi-Fi · MQTT</text>
+        <line class="d-arrow" x1="700" y1="231" x2="788" y2="231" marker-end="url(#h51)"/>
+        <text class="d-s" x="744" y="221" text-anchor="middle">MQTT</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 5.1.</b> Phương án B thêm đúng một chặng (UART, màu nhấn) để tách phần đo khỏi phần mạng. Gateway chuyển nguyên JSON lên đúng topic như phương án A, nên backend và client không phải sửa gì. Node vẫn tự chạy an toàn khi gateway chết.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="art">
+      <img src="images/web/06-two-boards.jpg" width="1536" height="1024" loading="lazy" alt="Hai bảng mạch ESP32 trên bàn gỗ. Bảng bên trái nằm trên breadboard với cảm biến, servo, LED và còi. Bảng bên phải đứng riêng, có LED trạng thái xanh và sóng Wi-Fi. Ba dây nối hai bảng, có xung sáng chạy trên dây.">
+      <span class="ov" style="left:22%;top:10%">Node: cảm biến + edge rules</span>
+      <span class="ov" style="left:80%;top:80%">Gateway: Wi-Fi + MQTT</span>
+      <span class="ov mono" style="left:56%;top:38%">UART TX/RX + GND</span>
+    </div>
+    <figcaption><b>Hình 5.2.</b> Phương án 2 mạch ngoài đời thực: chỉ cần 3 dây (TX, RX nối chéo và GND chung) giữa node và gateway.</figcaption>
+  </figure>
+
+  <p>Gateway là một <span class="term">transparent bridge</span>: nó không đọc nội dung payload, chỉ lo đăng ký node (HELLO), theo dõi sự sống hai chiều (HEARTBEAT, mất node quá 15 s thì publish <code>online:false</code> thay node), đồng bộ giờ cho node (TIME, vì node không có NTP) và báo trạng thái qua LED: đỏ = chưa có Wi-Fi, vàng = chưa có MQTT, xanh = sẵn sàng, nháy = mất node.</p>
+
+  <figure>
+    <div class="shot">
+      <div class="tag">Ảnh chụp · Phase 2</div>
+      <div class="what">Ảnh 5.1 — Hai mạch Wokwi (node + gateway) nối qua splice</div>
+      <div class="how">Chạy <code>node-wokwi</code> và <code>gateway-wokwi</code> trong hai cửa sổ VS Code, rồi <code>pnpm --filter @srdt/link-sim splice</code>. Chụp hai mạch cạnh nhau, LED gateway xanh, terminal splice in <code>node| …</code> và <code>gw| …</code>.</div>
+    </div>
+    <figcaption><b>Ảnh 5.1.</b> Phương án 2 mạch chạy trên mô phỏng.</figcaption>
+  </figure>
+
+  <h3><span class="n">5.2</span>Giao thức link giữa node và gateway (v0.2)</h3>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 200" role="img" aria-label="Cấu trúc frame: version, type, seq, payload, CRC lo, CRC hi. CRC-16 tính trên phần đầu và payload. Trên dây, frame được mã hoá COBS và kết thúc bằng byte 0x00.">
+        <text class="d-s" x="10" y="60">raw</text>
+        <rect class="d-box" x="60" y="30" width="90" height="50"/><text class="d-t" x="105" y="54" text-anchor="middle">version</text><text class="d-s" x="105" y="71" text-anchor="middle">1 B · 0x01</text>
+        <rect class="d-box" x="150" y="30" width="90" height="50"/><text class="d-t" x="195" y="54" text-anchor="middle">type</text><text class="d-s" x="195" y="71" text-anchor="middle">1 B</text>
+        <rect class="d-box" x="240" y="30" width="90" height="50"/><text class="d-t" x="285" y="54" text-anchor="middle">seq</text><text class="d-s" x="285" y="71" text-anchor="middle">1 B</text>
+        <rect class="d-box" x="330" y="30" width="400" height="50"/><text class="d-t" x="530" y="54" text-anchor="middle">payload</text><text class="d-s" x="530" y="71" text-anchor="middle">0…1024 B · JSON như MQTT</text>
+        <rect class="d-box" x="730" y="30" width="100" height="50"/><text class="d-t" x="780" y="54" text-anchor="middle">crc lo</text><text class="d-s" x="780" y="71" text-anchor="middle">1 B</text>
+        <rect class="d-box" x="830" y="30" width="100" height="50"/><text class="d-t" x="880" y="54" text-anchor="middle">crc hi</text><text class="d-s" x="880" y="71" text-anchor="middle">1 B</text>
+        <polyline class="d-line" points="60,88 60,96 730,96 730,88"/>
+        <text class="d-s" x="395" y="114" text-anchor="middle">CRC-16/CCITT tính trên đoạn này</text>
+
+        <text class="d-s" x="10" y="164">wire</text>
+        <rect class="d-box" x="60" y="140" width="770" height="40"/><text class="d-t" x="445" y="165" text-anchor="middle">COBS( raw frame ) — không còn byte 0x00 bên trong</text>
+        <rect class="d-accbox" x="830" y="140" width="100" height="40"/><text class="d-acc-t" x="880" y="165" text-anchor="middle">0x00</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 5.3.</b> Frame của link. Byte <code>0x00</code> là dấu kết thúc duy nhất, nên một frame hỏng do nhiễu chỉ làm mất chính frame đó; bên nhận tự đồng bộ lại ở byte <code>0x00</code> kế tiếp. Ví dụ HEARTBEAT seq 7: raw <code>01 06 07 ED 21</code> → wire <code>06 01 06 07 ED 21 00</code>.</figcaption>
+  </figure>
+
+  <p>Bên nhận kiểm tra theo thứ tự: độ dài → CRC → version → type. Sai ở bước nào thì bỏ frame và tăng bộ đếm lỗi, không trả lời. Link <strong>không có ack</strong>, vì độ tin cậy đã được đảm bảo ở tầng trên: lệnh có <code>commandId</code> và timeout, còn telemetry mất một frame thì 2 s sau đã có frame mới. Lớp transport là interface, nên cùng một code chạy được qua UART thật, USB serial, TCP (RFC 2217 của Wokwi) hoặc đường hầm MQTT.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Type</th><th>Tên</th><th>Hướng</th><th>Gateway xử lý</th></tr></thead>
+    <tbody>
+      <tr><td class="num">0x01–0x04</td><td>TELEMETRY, STATUS, EVENT, ACK</td><td>node → gw</td><td>publish lên topic tương ứng</td></tr>
+      <tr><td class="num">0x05</td><td>HELLO</td><td>node → gw</td><td>đăng ký node, nhớ <code>bootId</code></td></tr>
+      <tr><td class="num">0x06</td><td>HEARTBEAT</td><td>node → gw</td><td>cập nhật presence</td></tr>
+      <tr><td class="num">0x81</td><td>COMMAND</td><td>gw → node</td><td>chuyển lệnh từ MQTT xuống</td></tr>
+      <tr><td class="num">0x82</td><td>TIME</td><td>gw → node</td><td>đồng bộ giờ epoch</td></tr>
+      <tr><td class="num">0x83</td><td>LINK_STATE</td><td>gw → node</td><td>báo trạng thái MQTT, RSSI; là heartbeat của gateway</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3><span class="n">5.3</span>MQTT</h3>
+  <p>Thiết bị và backend không gọi trực tiếp nhau mà giao tiếp qua broker Mosquitto theo mô hình <span class="term">publish/subscribe</span>. Topic có dạng phân cấp <code>srdt/{deviceId}/…</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Topic</th><th>Hướng</th><th>QoS / retain</th><th>Nội dung</th></tr></thead>
+    <tbody>
+      <tr><td><code>srdt/{id}/telemetry</code></td><td>lên</td><td class="num">0</td><td>Số đo + trạng thái + actuator, mỗi 2 s và ngay khi đổi trạng thái</td></tr>
+      <tr><td><code>srdt/{id}/status</code></td><td>lên</td><td class="num">1 · retained</td><td>Online + actuator, khi đổi và mỗi 30 s; LWT <code>{online:false}</code></td></tr>
+      <tr><td><code>srdt/{id}/event</code></td><td>lên</td><td class="num">0</td><td>BOOT, STATE_CHANGED, SENSOR_FAULT, OVERRIDE_SET…</td></tr>
+      <tr><td><code>srdt/{id}/command</code></td><td>xuống</td><td class="num">1</td><td>Lệnh điều khiển có <code>commandId</code></td></tr>
+      <tr><td><code>srdt/{id}/command/ack</code></td><td>lên</td><td class="num">0</td><td>executed / rejected / failed</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>QoS 0</strong> (at most once) cho telemetry: mất một bản tin không sao vì bản tin mới đến ngay sau đó. <strong>QoS 1</strong> (at least once) cho lệnh và status: phải đến nơi, nếu trùng thì phía nhận tự lọc.</li>
+    <li><strong>Retained message:</strong> broker giữ lại status cuối cùng, nên client vừa kết nối nhận được trạng thái ngay, không phải chờ 30 s.</li>
+    <li><strong>Last Will and Testament (LWT):</strong> thiết bị đăng ký trước bản tin <code>{online:false}</code>. Nếu thiết bị chết đột ngột, broker tự phát bản tin này sau khoảng 20–25 s.</li>
+  </ul>
+
+  <figure>
+    <div class="shot">
+      <div class="tag">Ảnh chụp · Phase 2</div>
+      <div class="what">Ảnh 5.2 — Luồng MQTT thực tế</div>
+      <div class="how">Chạy <code>mosquitto_sub -h 127.0.0.1 -t 'srdt/#' -v</code> khi thiết bị đang chạy, rồi gửi một lệnh từ dashboard. Chụp terminal thấy telemetry, status, command và command/ack.</div>
+    </div>
+    <figcaption><b>Ảnh 5.2.</b> Các bản tin MQTT nhìn từ broker.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="ch" id="c6">
+  <h2><span class="n">06</span>Lớp Middleware: backend</h2>
+  <p class="chlede">Backend là client MQTT duy nhất được phép gửi lệnh, là nơi giữ twin, và là cổng duy nhất để client truy cập dữ liệu.</p>
+
+  <h3><span class="n">6.1</span>Ingestion pipeline</h3>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1000 330" role="img" aria-label="Mỗi bản tin MQTT qua 6 bước kiểm tra: kích thước, parse JSON, schema Zod, deviceId khớp topic, khử trùng. Sai bước nào thì bị bỏ. Bản tin hợp lệ được chia theo loại tới 4 service, rồi được lưu vào storage và đẩy qua SSE.">
+        <defs>
+          <marker id="h61" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="d-box" x="10" y="30" width="143" height="56" rx="5"/><text class="d-t" x="81.5" y="54" text-anchor="middle">MQTT message</text><text class="d-s" x="81.5" y="72" text-anchor="middle">srdt/{id}/…</text>
+        <rect class="d-box" x="177" y="30" width="143" height="56" rx="5"/><text class="d-t" x="248.5" y="54" text-anchor="middle">Kích thước</text><text class="d-s" x="248.5" y="72" text-anchor="middle">≤ 1 KB</text>
+        <rect class="d-box" x="344" y="30" width="143" height="56" rx="5"/><text class="d-t" x="415.5" y="54" text-anchor="middle">Parse JSON</text><text class="d-s" x="415.5" y="72" text-anchor="middle">cú pháp</text>
+        <rect class="d-box" x="511" y="30" width="143" height="56" rx="5"/><text class="d-t" x="582.5" y="54" text-anchor="middle">Schema Zod</text><text class="d-s" x="582.5" y="72" text-anchor="middle">@srdt/contracts</text>
+        <rect class="d-box" x="678" y="30" width="143" height="56" rx="5"/><text class="d-t" x="749.5" y="54" text-anchor="middle">deviceId</text><text class="d-s" x="749.5" y="72" text-anchor="middle">khớp topic</text>
+        <rect class="d-accbox" x="845" y="30" width="143" height="56" rx="5"/><text class="d-t" x="916.5" y="54" text-anchor="middle">Dedup</text><text class="d-s" x="916.5" y="72" text-anchor="middle">(bootId, seq)</text>
+        <line class="d-arrow" x1="153" y1="58" x2="175" y2="58" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="320" y1="58" x2="342" y2="58" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="487" y1="58" x2="509" y2="58" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="654" y1="58" x2="676" y2="58" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="821" y1="58" x2="843" y2="58" marker-end="url(#h61)"/>
+        <!-- drops -->
+        <line class="d-dash" x1="248.5" y1="86" x2="248.5" y2="102"/><text class="d-s" x="248.5" y="116" text-anchor="middle">bỏ + log</text>
+        <line class="d-dash" x1="415.5" y1="86" x2="415.5" y2="102"/><text class="d-s" x="415.5" y="116" text-anchor="middle">bỏ + log</text>
+        <line class="d-dash" x1="582.5" y1="86" x2="582.5" y2="102"/><text class="d-s" x="582.5" y="116" text-anchor="middle">bỏ + log</text>
+        <line class="d-dash" x1="749.5" y1="86" x2="749.5" y2="102"/><text class="d-s" x="749.5" y="116" text-anchor="middle">bỏ + log</text>
+        <!-- bus to services -->
+        <polyline class="d-arrow" points="916.5,86 916.5,140 140,140"/>
+        <line class="d-arrow" x1="140" y1="140" x2="140" y2="166" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="380" y1="140" x2="380" y2="166" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="620" y1="140" x2="620" y2="166" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="860" y1="140" x2="860" y2="166" marker-end="url(#h61)"/>
+        <text class="d-s" x="500" y="132" text-anchor="middle">chia theo loại topic</text>
+
+        <rect class="b-mid" x="30" y="168" width="220" height="52" rx="5"/><text class="d-t" x="140" y="190" text-anchor="middle">TelemetryService</text><text class="d-s" x="140" y="208" text-anchor="middle">telemetry</text>
+        <rect class="b-mid" x="270" y="168" width="220" height="52" rx="5"/><text class="d-t" x="380" y="190" text-anchor="middle">DeviceService</text><text class="d-s" x="380" y="208" text-anchor="middle">status · presence</text>
+        <rect class="b-mid" x="510" y="168" width="220" height="52" rx="5"/><text class="d-t" x="620" y="190" text-anchor="middle">EventService</text><text class="d-s" x="620" y="208" text-anchor="middle">event</text>
+        <rect class="b-mid" x="750" y="168" width="220" height="52" rx="5"/><text class="d-t" x="860" y="190" text-anchor="middle">CommandService</text><text class="d-s" x="860" y="208" text-anchor="middle">command/ack</text>
+
+        <line class="d-line" x1="140" y1="220" x2="140" y2="246"/><line class="d-line" x1="380" y1="220" x2="380" y2="246"/>
+        <line class="d-line" x1="620" y1="220" x2="620" y2="246"/><line class="d-line" x1="860" y1="220" x2="860" y2="246"/>
+        <line class="d-line" x1="140" y1="246" x2="860" y2="246"/>
+        <line class="d-arrow" x1="300" y1="246" x2="300" y2="268" marker-end="url(#h61)"/>
+        <line class="d-arrow" x1="710" y1="246" x2="710" y2="268" marker-end="url(#h61)"/>
+
+        <rect class="d-box" x="150" y="270" width="300" height="48" rx="5"/><text class="d-t" x="300" y="291" text-anchor="middle">Storage</text><text class="d-s" x="300" y="308" text-anchor="middle">memory | Firestore · downsample</text>
+        <rect class="d-box" x="550" y="270" width="320" height="48" rx="5"/><text class="d-t" x="710" y="291" text-anchor="middle">RealtimeHub</text><text class="d-s" x="710" y="308" text-anchor="middle">SSE → dashboard, app</text>
+      </svg>
+    </div>
+    <figcaption><b>Hình 6.1.</b> Mọi bản tin từ thiết bị đi qua cùng một chuỗi kiểm tra trước khi chạm vào twin. Một bản tin xấu chỉ bị bỏ và ghi log, không làm hỏng service. Khử trùng theo <code>(bootId, seq)</code> giúp QoS 1 gửi lặp không tạo bản ghi trùng.</figcaption>
+  </figure>
+
+  <h3><span class="n">6.2</span>Device presence</h3>
+  <p>Thiết bị được coi là <strong>online</strong> khi có bản tin thật (bản retained cũ và LWT không tính). Thiết bị chuyển <strong>offline</strong> khi có LWT, hoặc khi không có dữ liệu trong 45 s (backend quét mỗi 10 s). Mỗi lần chuyển trạng thái sinh ra sự kiện <code>DEVICE_ONLINE</code> / <code>DEVICE_OFFLINE</code>. Phía client đánh dấu dữ liệu là "cũ" (stale) nếu thiết bị online nhưng đã 15 s không có telemetry.</p>
+
+  <h3><span class="n">6.3</span>Vòng đời của một lệnh</h3>
+  <figure>
+    <div class="fig">
+<pre class="mermaid">
+stateDiagram-v2
+  direction LR
+  [*] --> pending: POST /commands
+  pending --> sent: broker PUBACK
+  pending --> executed: ack đến trước PUBACK
+  sent --> executed: ack executed
+  sent --> rejected: ack rejected
+  sent --> failed: ack failed
+  pending --> timeout: quá 10 s
+  sent --> timeout: quá 10 s không ack
+  executed --> [*]
+  rejected --> [*]
+  failed --> [*]
+  timeout --> [*]
+</pre>
+    </div>
+    <figcaption><b>Hình 6.2.</b> Các trạng thái của một lệnh. Mỗi lần chuyển là một phép <span class="term">compare-and-set</span>, nên ack đến trước PUBACK vẫn giữ đúng <code>executed</code>, và ack đến muộn không ghi đè được <code>timeout</code>.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="fig">
+<pre class="mermaid">
+sequenceDiagram
+  participant UI as Dashboard / App
+  participant BE as Backend
+  participant MQ as Mosquitto
+  participant GW as Gateway (2 mạch)
+  participant DV as Node / mạch đơn
+  UI->>BE: POST /commands {OPEN_WINDOW, 45}
+  Note over BE: rate limit 30/phút, 409 nếu offline, 503 nếu mất broker
+  BE->>MQ: srdt/room-01/command (QoS 1)
+  MQ-->>BE: PUBACK → sent
+  BE-->>UI: 202 {commandId, sent}
+  MQ->>GW: command
+  GW->>DV: frame COMMAND (UART)
+  Note over DV: validate, servo 45°, override 120 s
+  DV->>GW: status + ack executed
+  GW->>MQ: status (retained), command/ack
+  MQ->>BE: ack
+  BE-->>UI: SSE command executed → twin cửa 45°
+</pre>
+    </div>
+    <figcaption><b>Hình 6.3.</b> Đường đi của lệnh mở cửa 45°. Với phương án 1 mạch thì bỏ chặng gateway. Thời gian đo được từ <code>sent</code> tới <code>executed</code> với fake-device khoảng 3 ms.</figcaption>
+  </figure>
+
+  <h3><span class="n">6.4</span>Lưu trữ</h3>
+  <p>Các service chỉ biết một interface (<code>DeviceStore</code>, <code>TelemetryStore</code>, <code>EventStore</code>, <code>CommandStore</code>), theo <span class="term">repository pattern</span>. Có hai driver: <strong>memory</strong> (mặc định, mất khi khởi động lại) và <strong>Cloud Firestore</strong>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Collection</th><th>Document id</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td><code>devices/{code}</code></td><td>mã thiết bị</td><td>trạng thái reported mới nhất; <code>lastSeenAt</code> ghi tối đa 1 lần / 15 s</td></tr>
+      <tr><td><code>devices/{code}/telemetry/{id}</code></td><td><code>{bootId}-{seq}</code></td><td>id cố định nên ghi trùng là idempotent; downsample</td></tr>
+      <tr><td><code>devices/{code}/events/{id}</code></td><td><code>{bootId}-{seq}</code></td><td>sự kiện thiết bị và server</td></tr>
+      <tr><td><code>commands/{id}</code></td><td>uuid</td><td>chuyển trạng thái bằng transaction</td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Tối ưu chi phí.</strong> Gói miễn phí giới hạn 20 000 lượt ghi mỗi ngày. Live UI vẫn nhận telemetry mỗi 2 s qua SSE, nhưng bản lưu chỉ giữ 1 bản ghi mỗi 15 s, và <code>devices.put</code> chỉ ghi khi có thay đổi thật. Nhờ vậy số lượt ghi đo được giảm từ 13 920 xuống 6 480 lượt/ngày/thiết bị, đủ cho 3 thiết bị trong gói miễn phí.</p>
+
+  <h3><span class="n">6.5</span>API cho client</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/api/devices/:code</code></td><td>Snapshot: thiết bị + telemetry 15 phút + 20 event + 20 lệnh</td></tr>
+      <tr><td>GET</td><td><code>/api/devices/:code/stream</code></td><td>SSE: <code>snapshot</code> đầu tiên, sau đó <code>device</code> / <code>telemetry</code> / <code>event</code> / <code>command</code></td></tr>
+      <tr><td>POST</td><td><code>/api/devices/:code/commands</code></td><td>Gửi lệnh → 202 / 409 / 429 / 503</td></tr>
+      <tr><td>POST</td><td><code>/api/devices/:code/assistant</code></td><td>Câu nói → ý định, câu trả lời, các lệnh đã tạo</td></tr>
+      <tr><td>GET</td><td><code>/health</code></td><td>Trạng thái MQTT, storage, số client SSE</td></tr>
+    </tbody>
+  </table></div>
+  <p>Hệ thống chọn <strong>SSE</strong> thay vì WebSocket vì dữ liệu chỉ cần chảy một chiều từ server xuống; lệnh đi ngược lên bằng REST. SSE chạy trên HTTP thường và trình duyệt tự kết nối lại khi rớt.</p>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="ch" id="c7">
+  <h2><span class="n">07</span>Lớp ứng dụng và dịch vụ</h2>
+  <p class="chlede">Hai client ngang hàng, cùng dùng một API và cùng logic twin trong <code>@srdt/twin-core</code>.</p>
+
+  <h3><span class="n">7.1</span>Dashboard web</h3>
+  <p>Viết bằng Next.js, xuất dạng static. Dashboard gồm thẻ số đo (tô màu theo ngưỡng), bản vẽ phòng (twin SVG: góc cửa, còi, trạng thái), biểu đồ 15 phút có đường ngưỡng, bảng điều khiển với đếm ngược override, scenes và nhật ký sự kiện. Dữ liệu đến từ snapshot REST, sau đó cập nhật bằng luồng SSE qua một reducer thuần (<code>applyMessage</code>).</p>
+  <figure>
+    <div class="shot">
+      <div class="tag">Ảnh chụp · Phase 2</div>
+      <div class="what">Ảnh 7.1 — Dashboard ở trạng thái NORMAL và DANGER</div>
+      <div class="how">Chạy backend + dashboard + <code>fake-device</code>. Chụp một ảnh khi <code>calm</code> và một ảnh sau lệnh <code>smoke</code> (DANGER, cửa 90°, còi bật). Nên chụp thêm một ảnh có nhãn "manual" và đếm ngược override.</div>
+    </div>
+    <figcaption><b>Ảnh 7.1.</b> Digital twin trên web.</figcaption>
+  </figure>
+
+  <h3><span class="n">7.2</span>App Android</h3>
+  <p>Viết bằng Expo / React Native, gồm 4 tab: <strong>Home</strong> (twin + số đo), <strong>Controls</strong> (cửa sổ, còi, scenes, bảng mạch), <strong>Trends</strong> (biểu đồ) và <strong>Activity</strong> (sự kiện), cộng thêm màn Settings. Trạng thái được quản lý bằng Jotai, SSE dùng <code>react-native-sse</code>, cài đặt lưu bằng MMKV.</p>
+  <figure>
+    <div class="shots">
+      <div class="shot"><div class="tag">Phase 2</div><div class="what">Home</div><div class="how">Twin + thẻ số đo</div></div>
+      <div class="shot"><div class="tag">Phase 2</div><div class="what">Controls</div><div class="how">Góc cửa, scenes</div></div>
+      <div class="shot"><div class="tag">Phase 2</div><div class="what">Trends</div><div class="how">Biểu đồ 15 phút</div></div>
+      <div class="shot"><div class="tag">Phase 2</div><div class="what">Voice</div><div class="how">Đang nghe + thẻ kết quả lệnh</div></div>
+    </div>
+    <figcaption><b>Ảnh 7.2.</b> Bốn màn chính của app, chụp trên emulator Android.</figcaption>
+  </figure>
+
+  <h3><span class="n">7.3</span>Trợ lý giọng nói</h3>
+  <figure>
+    <div class="art">
+      <img src="images/web/07-voice-assistant.jpg" width="1536" height="1024" loading="lazy" alt="Bàn tay cầm điện thoại; sóng giọng nói đi vào điện thoại, qua một quả cầu AI phát sáng, rồi tới cửa sổ của căn phòng đang mở ra. Gần điện thoại có dấu tích xanh.">
+      <span class="ov mono" style="left:8%;top:40%">giọng nói</span>
+      <span class="ov" style="left:44%;top:56%">LLM</span>
+      <span class="ov mono" style="left:33%;top:23%">ack ✓</span>
+      <span class="ov mono" style="left:72%;top:16%">OPEN_WINDOW</span>
+    </div>
+    <figcaption><b>Hình 7.1.</b> Câu nói trở thành lệnh thật: điện thoại nhận giọng nói, LLM hiểu ý, cửa sổ mở, và app nhận ack xác nhận.</figcaption>
+  </figure>
+  <figure>
+    <div class="fig">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as Người dùng
+  participant A as App
+  participant S as Backend /assistant
+  participant L as LLM
+  participant D as Thiết bị
+  U->>A: nói "mở cửa sổ một nửa"
+  A->>A: STT trên máy (vi-VN / en-US)
+  A->>S: {text, locale, history}
+  S->>L: prompt + trạng thái phòng hiện tại
+  L-->>S: JSON {intent, commands, reply}
+  S->>S: validate bằng contracts, kẹp value 1–90
+  S->>D: OPEN_WINDOW 45, source ai (MQTT)
+  S-->>A: reply + commandId
+  A->>U: đọc câu trả lời (TTS)
+  D-->>A: ack qua SSE → thẻ kết quả ✓
+</pre>
+    </div>
+    <figcaption><b>Hình 7.2.</b> Một lượt hội thoại. LLM chỉ đề xuất kế hoạch; backend tự kiểm tra và tạo lệnh. Vì vậy lệnh của AI chịu đúng rate limit, ack, timeout và lịch sử như lệnh tay.</figcaption>
+  </figure>
+  <p>Hệ thống đặt LLM ở server vì ba lý do: khoá API không nằm trong APK; server có sẵn trạng thái twin mới nhất để đưa vào prompt; và mọi lệnh đều đi qua cùng một cổng kiểm soát. Mỗi câu nói chỉ cần <strong>một</strong> lần gọi LLM với output JSON theo schema, thay vì vòng lặp tool-calling. Cách này nhanh hơn và dễ kiểm thử hơn. Provider có thể đổi giữa Gemini, Claude và một bộ luật cố định (<code>ASSISTANT_PROVIDER</code>).</p>
+
+  <h3><span class="n">7.4</span>Dịch vụ: scenes</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Scene</th><th>Các lệnh gửi lần lượt</th></tr></thead>
+    <tbody>
+      <tr><td>Welcome</td><td><code>IDENTIFY</code> → <code>SHOW_MESSAGE "Welcome!"</code></td></tr>
+      <tr><td>Ventilate</td><td><code>OPEN_WINDOW 90</code> → <code>SHOW_MESSAGE "Airing the room"</code></td></tr>
+      <tr><td>Good night</td><td><code>CLOSE_WINDOW</code> → <code>SHOW_MESSAGE "Good night"</code></td></tr>
+      <tr><td>Automatic</td><td><code>CLEAR_OVERRIDE</code> → <code>SHOW_MESSAGE "Auto mode"</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>Scene chỉ tồn tại ở phía client. Thiết bị không biết scene là gì, chỉ nhận các lệnh thường, nên không phải sửa firmware khi thêm scene mới.</p>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="ch" id="c8">
+  <h2><span class="n">08</span>Độ tin cậy, kiểm thử và thực nghiệm</h2>
+
+  <h3><span class="n">8.1</span>Cơ chế tin cậy</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Vấn đề</th><th>Cơ chế</th><th>Ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td>Mất Internet</td><td>Quyết định an toàn chạy tại edge</td><td>Firmware</td></tr>
+      <tr><td>Số đo nhiễu, dao động quanh ngưỡng</td><td>Trung bình trượt + hysteresis + giữ mức 5 s</td><td>Edge rules</td></tr>
+      <tr><td>Cảm biến hỏng</td><td><code>SENSOR_FAULT</code>; mô hình nhường cho rule</td><td>Edge</td></tr>
+      <tr><td>Nhiễu trên dây UART</td><td>CRC-16 + COBS tự đồng bộ lại</td><td>Link</td></tr>
+      <tr><td>Thiết bị chết đột ngột</td><td>LWT + quét 45 s + heartbeat của gateway</td><td>MQTT, backend</td></tr>
+      <tr><td>Bản tin lặp do QoS 1</td><td>Khử trùng <code>(bootId, seq)</code>, id idempotent</td><td>Backend, Firestore</td></tr>
+      <tr><td>Lệnh không đến nơi</td><td>QoS 1 + ack + timeout 10 s</td><td>Backend</td></tr>
+      <tr><td>Ack và PUBACK đến lệch thứ tự</td><td>Compare-and-set khi chuyển trạng thái</td><td>CommandStore</td></tr>
+      <tr><td>Spam lệnh (kể cả từ AI)</td><td>Rate limit 30 lệnh/phút/thiết bị</td><td>Backend</td></tr>
+      <tr><td>Dữ liệu sai định dạng</td><td>Schema Zod chung, giới hạn 1 KB</td><td>Contracts</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3><span class="n">8.2</span>Mô phỏng: thay phần nào bằng đồ giả</h3>
+  <p>Mỗi thành phần đều có bản giả: <strong>fake-device</strong> thay toàn bộ thiết bị và có preset <code>hot</code>, <code>smoke</code>, <code>humid</code>, <code>night</code>…; <strong>fake-node</strong> / <strong>fake-gateway</strong> thay từng mạch; <strong>splice</strong> nối hai mạch Wokwi và giả lập rút dây (<code>cut 20</code>). Backend và client chạy giống hệt ở mọi tổ hợp, vì chúng chỉ nhìn thấy topic MQTT.</p>
+
+  <h3><span class="n">8.3</span>Kiểm thử tự động</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Bộ test</th><th>Số test</th><th>Nội dung</th></tr></thead>
+    <tbody>
+      <tr><td>Firmware native (Unity)</td><td class="num">115</td><td>Edge rules, protocol, link frame, gateway/node, TinyML</td></tr>
+      <tr><td>Contracts (Vitest)</td><td class="num">28</td><td>Schema mọi loại message</td></tr>
+      <tr><td>Server (Vitest)</td><td class="num">36</td><td>Luồng ingest, vòng đời lệnh, storage contract, parity TinyML C++/TS, assistant</td></tr>
+      <tr><td>Link-sim (Vitest)</td><td class="num">23</td><td>Frame, transport, bridge, splice</td></tr>
+    </tbody>
+  </table></div>
+  <p>Ngoài ra, driver Firestore được chạy lại toàn bộ storage contract test trên Firestore emulator.</p>
+
+  <h3><span class="n">8.4</span>Kết quả thực nghiệm</h3>
+  <ul>
+    <li>Luồng end-to-end thiết bị → dashboard → lệnh ngược lại chạy được cả với 1 mạch và 2 mạch trên Wokwi.</li>
+    <li>Lệnh <code>OPEN_WINDOW 45</code> đi từ <code>sent</code> tới <code>executed</code> trong khoảng 3 ms (fake-device, máy local).</li>
+    <li>Rút dây link 20 s: sau 15 s dashboard báo offline, nối lại thì online.</li>
+    <li>Tắt broker: thiết bị kết nối lại với backoff 1–16 s, mỗi lần mất kết nối chỉ kết nối lại đúng một lần.</li>
+    <li>TinyML: kịch bản nóng ẩm → UNCOMFORTABLE, cửa 45° (rule engine vẫn để 0°); AQ 627 có người → cửa 60°.</li>
+    <li>Firestore: dữ liệu và biểu đồ vẫn còn sau khi khởi động lại backend; số lượt ghi nằm trong gói miễn phí.</li>
+  </ul>
+  <figure>
+    <div class="shot">
+      <div class="tag">Ảnh chụp · Phase 2</div>
+      <div class="what">Ảnh 8.1 — Firestore console</div>
+      <div class="how">Chụp collection <code>devices/room-01/telemetry</code> với các document id dạng <code>{bootId}-{seq}</code>.</div>
+    </div>
+    <figcaption><b>Ảnh 8.1.</b> Dữ liệu được lưu bền vững trên cloud.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="ch" id="c9">
+  <h2><span class="n">09</span>Hạn chế và hướng phát triển</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Hạng mục</th><th>Hiện trạng</th><th>Hướng tiếp theo</th></tr></thead>
+    <tbody>
+      <tr><td>Xác thực người dùng</td><td><span class="status-no">chưa có</span></td><td>Firebase Auth cho dashboard, app và API</td></tr>
+      <tr><td>Bảo mật broker</td><td><span class="status-no">chưa TLS</span>, chỉ chạy trong LAN</td><td>TLS + user/password (HiveMQ Cloud, EMQX hoặc Mosquitto trên VM)</td></tr>
+      <tr><td>2 mạch thật</td><td><span class="status-part">mới chạy trên Wokwi</span></td><td>Chạy theo checklist nối dây UART (M3)</td></tr>
+      <tr><td>Triển khai cloud</td><td><span class="status-part">Firestore xong</span>; Hosting, Cloud Run mới là mock</td><td>Deploy backend lên Cloud Run, dashboard lên Firebase Hosting</td></tr>
+      <tr><td>Nhiều node</td><td><span class="status-part">1 node / gateway</span></td><td>Gateway đa node, hoặc ESP-NOW thay UART</td></tr>
+      <tr><td>Buffer khi mất mạng</td><td><span class="status-no">bỏ telemetry</span> khi offline</td><td>Lưu tạm trên flash, gửi bù khi có mạng</td></tr>
+      <tr><td>Twin</td><td><span class="status-done">SVG 2D</span></td><td>Twin 3D (three.js), giữ nguyên dữ liệu đầu vào</td></tr>
+      <tr><td>Cảm biến khí</td><td><span class="status-part">biến trở giả lập / MQ-135 tương đối</span></td><td>Cảm biến hiệu chuẩn (CO₂ NDIR, PM2.5)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ A ============ -->
+<section class="ch" id="pa">
+  <h2><span class="n">A</span>Thuật ngữ</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Thuật ngữ</th><th>Nghĩa trong hệ thống này</th></tr></thead>
+    <tbody>
+      <tr><td>Digital twin</td><td>Bản sao số của phòng: trạng thái thiết bị báo lên gần nhất + telemetry mới nhất</td></tr>
+      <tr><td>Telemetry</td><td>Bản tin số đo định kỳ từ thiết bị</td></tr>
+      <tr><td>Edge computing</td><td>Xử lý và ra quyết định ngay tại thiết bị, gần nguồn dữ liệu</td></tr>
+      <tr><td>Hysteresis</td><td>Ngưỡng vào khác ngưỡng ra để trạng thái không dao động</td></tr>
+      <tr><td>Actuator</td><td>Cơ cấu chấp hành: servo, còi, LED, LCD</td></tr>
+      <tr><td>Publish / subscribe</td><td>Mô hình giao tiếp qua broker; bên gửi và bên nhận không biết nhau</td></tr>
+      <tr><td>QoS 0 / 1</td><td>Mức đảm bảo giao bản tin của MQTT: tối đa một lần / ít nhất một lần</td></tr>
+      <tr><td>Retained message</td><td>Bản tin cuối cùng của topic được broker giữ lại cho client mới</td></tr>
+      <tr><td>LWT</td><td>Bản tin "di chúc" broker tự phát khi client mất kết nối bất thường</td></tr>
+      <tr><td>Presence</td><td>Trạng thái online / offline của thiết bị</td></tr>
+      <tr><td>Ack</td><td>Xác nhận thiết bị đã thực thi, từ chối hay lỗi khi nhận lệnh</td></tr>
+      <tr><td>Idempotent</td><td>Thực hiện lặp nhiều lần cho cùng kết quả như một lần</td></tr>
+      <tr><td>Compare-and-set</td><td>Chỉ chuyển trạng thái khi trạng thái hiện tại đúng như mong đợi</td></tr>
+      <tr><td>COBS</td><td>Cách mã hoá để byte 0x00 chỉ xuất hiện ở cuối frame</td></tr>
+      <tr><td>CRC-16</td><td>Mã kiểm tra lỗi 16 bit cho frame</td></tr>
+      <tr><td>SSE</td><td>Server-Sent Events: server đẩy sự kiện một chiều qua HTTP</td></tr>
+      <tr><td>TinyML</td><td>Mô hình học máy đủ nhỏ để chạy trên vi điều khiển</td></tr>
+      <tr><td>Quantization (int8)</td><td>Lượng tử hoá: lưu trọng số bằng số nguyên 8 bit để giảm kích thước</td></tr>
+      <tr><td>Manual override</td><td>Lệnh của người tạm thời thắng điều khiển tự động</td></tr>
+      <tr><td>Safety floor</td><td>Lớp an toàn cuối: rule DANGER luôn thắng mô hình</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ B ============ -->
+<section class="ch" id="pb">
+  <h2><span class="n">B</span>Kế hoạch hình ảnh</h2>
+  <p>Báo cáo dùng ba loại hình. <strong>Minh hoạ</strong> (tạo bằng AI, không chứa chữ; nhãn được đặt bằng HTML để luôn chính xác) giúp nắm ý trực giác. <strong>Sơ đồ</strong> (vẽ vector) thể hiện chính xác cơ chế. <strong>Ảnh chụp</strong> thật sẽ được thêm ở Phase 2, thay vào các khung nét đứt ở trên.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Hình</th><th>Loại</th><th>Trạng thái</th></tr></thead>
+    <tbody>
+      <tr><td>1.1 Cloud-only và edge-first · 2.1 Digital twin · 2.2 Câu chuyện 4 bước</td><td>Minh hoạ AI</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>4.1 Giải phẫu căn phòng · 5.2 Hai mạch · 7.1 Giọng nói · ảnh bìa</td><td>Minh hoạ AI</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>2.3 Vòng khép kín · 3.1 Kiến trúc 6 lớp</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>4.2 State machine · 4.3 Pipeline TinyML</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>5.1 Hai phương án · 5.3 Frame link</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>6.1 Ingest · 6.2 Vòng đời lệnh · 6.3 Downlink · 7.2 Trợ lý giọng nói</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>Ảnh 4.1 Mạch Wokwi 1 board</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · tự chụp trong VS Code</span></td></tr>
+      <tr><td>Ảnh 5.1 Hai mạch Wokwi</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · tự chụp trong VS Code</span></td></tr>
+      <tr><td>Ảnh 5.2 mosquitto_sub</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · chụp terminal</span></td></tr>
+      <tr><td>Ảnh 7.1 Dashboard</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · có thể tự động hoá</span></td></tr>
+      <tr><td>Ảnh 7.2 App Android</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · chụp trên emulator</span></td></tr>
+      <tr><td>Ảnh 8.1 Firestore console</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · cần đăng nhập</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>Smart Room Digital Twin · Tổng hợp từ mã nguồn và tài liệu của repo <span class="mono">smart-room-digital-twin</span>, tháng 10/2026.</footer>
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", fontFamily: '"Be Vietnam Pro", system-ui, sans-serif' });
+</script>
+</body>
+</html>
