@@ -32,6 +32,24 @@ Bộ spec cho app Android `@srdt/mobile`. Viết ngày 2026-10-10, dựa trên c
 | D14 | Copy UI tiếng Anh như dashboard; voice hiểu cả tiếng Việt và tiếng Anh | Đồng bộ với dashboard; xem câu hỏi mở Q1 ở `06-roadmap.md` |
 | D15 | Light + dark theo hệ thống, cho phép ép trong Settings | Dashboard đã có dark mode (`prefers-color-scheme`) |
 
+## Trạng thái triển khai (2026-10-10)
+
+M0–M5 đã có code (`packages/twin-core`, `mobile/`, `server/src/assistant/`). Chỗ code khác spec ban đầu (code là
+sự thật):
+
+| Spec ghi | Code làm | Vì sao |
+|---|---|---|
+| Metro: `extraNodeModules` + `disableHierarchicalLookup` (§5 của 01) | Config mặc định của Expo + `blockList` chặn `dashboard/`, `server/`, `device/`, `ml/` | SDK 55 tự hiểu pnpm workspace (isolated); tắt hierarchical lookup làm hỏng cách pnpm đặt dependency bắc cầu |
+| pnpm mặc định "như request-app" | Request-app thật ra dùng `node-linker=hoisted`; repo này giữ isolated, chỉ thêm `react-native-css-interop` làm dependency trực tiếp | Babel của NativeWind chèn import `react-native-css-interop/jsx-runtime`, phải resolve được từ `mobile/` |
+| `react-native-mmkv` (v3) | v4 + `react-native-nitro-modules` | Bản `expo install` chọn cho SDK 55 |
+| `@gorhom/bottom-sheet` cho voice sheet | `app/voice.tsx` là route `transparentModal`, panel tự vẽ + Reanimated | Ít dependency native hơn; không cần snap points |
+| Tab bar mặc định + nút mic nổi | `components/tab-bar.tsx` tự vẽ (2 tab · mic · 2 tab) | Kiểm soát vị trí nút mic và badge |
+| `jotai-effect` cho theo dõi lệnh | `store.sub(commandsAtom)` trong `twin-stream.tsx` | Một dependency ít hơn |
+| Gemini qua `@google/genai` | `fetch` tới REST `generateContent` với `responseSchema` | Không thêm dependency cho server; dễ giả lập trong test |
+| `expo-speech-recognition` bản mới nhất | Ghim `3.1.3` (dist-tag `sdk-55`) | 57.x cần Expo SDK 57, lỗi biên dịch Kotlin |
+| — | `components/touchable.tsx` thay `Pressable` có style dạng hàm | NativeWind làm mất `style={({ pressed }) => …}` |
+| Sheet chọn thiết bị trong Settings | Danh sách mở ngay dưới ô "Device code" | Đơn giản hơn, đủ cho vài thiết bị |
+
 ## Nguyên tắc không đổi so với dashboard
 
 1. App **chỉ phản chiếu** trạng thái thiết bị. Không bao giờ tự giả định actuator đã đổi: chờ `status`/`ack` thật

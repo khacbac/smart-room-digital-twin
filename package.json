@@ -10,6 +10,9 @@
     "typecheck": "pnpm -r typecheck",
     "dev:server": "pnpm --filter @srdt/server dev",
     "dev:dashboard": "pnpm --filter @srdt/dashboard dev",
-    "build:dashboard": "pnpm --filter @srdt/dashboard build"
+    "build:dashboard": "pnpm --filter @srdt/dashboard build",
+    "mobile": "pnpm --filter @srdt/mobile start",
+    "mobile:android": "pnpm --filter @srdt/mobile android",
+    "mobile:typecheck": "pnpm --filter @srdt/mobile typecheck"
   }
 }
