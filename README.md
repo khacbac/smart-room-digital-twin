@@ -17,6 +17,9 @@ live và gửi lệnh ngược lại.
 
 **Sơ đồ kiến trúc, bản đồ code, luồng tín hiệu: [`docs/architecture.md`](docs/architecture.md)** (đọc cái này trước).
 
+App Android (Expo) là client thứ hai của cùng backend, có thêm điều khiển bằng giọng nói qua LLM:
+[`mobile/README.md`](mobile/README.md).
+
 Trạng thái (2026-09-30): luồng thiết bị → dashboard → lệnh ngược lại chạy end-to-end, cả 1 mạch lẫn 2 mạch
 (node + gateway) trong Wokwi. Chưa làm: chạy 2 mạch thật (M3, đã có checklist), database/cloud (backend lưu
 tạm trong RAM, đã chừa chỗ cho team cloud, xem [`docs/cloud.md`](docs/cloud.md)).
@@ -372,6 +375,7 @@ cd device && pio run -e esp32-s3 -e node -e gateway -e kit -e node-kit   # build
 | GET | `/api/devices/:code/stream` | SSE: `snapshot` trước, sau đó `device` / `telemetry` / `event` / `command` |
 | POST | `/api/devices/:code/commands` | `{ action, value?, source? }` → `202` / `409 DEVICE_OFFLINE` / `429` / `503 BROKER_DISCONNECTED` |
 | GET | `/api/devices/:code/commands?limit=` | lịch sử command |
+| POST | `/api/devices/:code/assistant` | `{ text, locale, history? }` → `200 { intent, reply, commands, pendingConfirmation }` / `429` / `502` / `503 ASSISTANT_DISABLED` / `504`. Lệnh gửi với `source: "ai"` (app mobile, [`mobile/specs/05-voice-assistant.md`](mobile/specs/05-voice-assistant.md)) |
 
 Action: `OPEN_WINDOW` (value 1–90), `CLOSE_WINDOW`, `BUZZER_ON`, `BUZZER_OFF`, `CLEAR_OVERRIDE`, `PING`.
 Lệnh từ dashboard là **manual override 120 s**; hết hạn (hoặc `CLEAR_OVERRIDE`) thì edge rules điều khiển lại.
@@ -386,10 +390,12 @@ Bản đồ chi tiết từng file: [`docs/architecture.md` §3](docs/architectu
 | `ml/` | Pipeline TinyML: `policy.md` (chính sách gán nhãn cho LLM), `generate_data.py` (Gemini API / offline), `train.py` (torch → int8 → `model_data.h` + `model.json`), `reports/report.md` | ✅ xem [`ml/README.md`](ml/README.md) |
 | `broker/` | Config Mosquitto: `mosquitto.conf` (local), `mosquitto-lan.conf` (cho mạch thật) | ✅ |
 | `packages/contracts/` | `@srdt/contracts`: Zod schema MQTT + kiểu dữ liệu backend ⇄ dashboard | ✅ |
+| `packages/twin-core/` | `@srdt/twin-core`: logic thuần dùng chung dashboard + mobile (reducer twin, ngưỡng, nhãn, luật xung đột lệnh) | ✅ |
 | `server/` | Backend: MQTT ingest, presence, command round trip, REST + SSE, `scripts/fake-device.ts`, `scripts/edge-ai/` (suy luận TinyML bản TS) | ✅ |
 | `server/src/storage/` | Interface storage + driver `memory` và `firestore` (Cloud Firestore) | ✅ cả hai chạy được |
 | `tools/link-sim/` | fake-gateway / fake-node / splice cho phương án 2 mạch (serial, TCP, RFC 2217, MQTT tunnel) | ✅ |
 | `dashboard/` | Next.js 16 static export: value cards, room twin (SVG), chart 15 phút, controls, events | ✅ nguồn `backend`; 🟡 nguồn `firestore` |
+| `mobile/` | App Android (Expo SDK 55): cùng các màn của dashboard + voice assistant; `server/src/assistant/` là phần LLM | ✅ emulator; 🟡 chưa thử điện thoại thật |
 | `cloud/` | Firestore rules + indexes (đã deploy); Firebase Hosting / Dockerfile Cloud Run vẫn là mock | 🟡 một phần |
 | `docs/` | [kiến trúc](docs/architecture.md), [link 2 mạch](docs/link-protocol.md), [cloud](docs/cloud.md), spec gốc | |
 
