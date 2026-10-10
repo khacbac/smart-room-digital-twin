@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const [theme, setTheme] = useAtom(themePreferenceAtom);
   return (
     <Screen
+      standalone
       header={
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <IconButton icon={ChevronLeft} label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} />

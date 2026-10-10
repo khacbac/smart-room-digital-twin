@@ -248,7 +248,8 @@ export default function VoiceSheet() {
                   <Keyboard size={20} color={colors.text} />
                 </RoundButton>
               </View>
-              <Text variant="caption" tone="muted">
+              {/* fixed width: Android keeps the first measured width when the label changes */}
+              <Text variant="caption" tone="muted" style={{ width: 240, textAlign: "center" }}>
                 {speech.listening ? "Listening… tap to stop" : busy ? "Thinking…" : turns.length ? "Ask again" : "Tap to talk"}
               </Text>
             </View>

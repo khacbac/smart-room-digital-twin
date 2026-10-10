@@ -14,7 +14,7 @@ const AnimatedLine = Animated.createAnimatedComponent(Line);
 // the bottom-left like a window hinge. The thin needle is the angle the device reports;
 // the big knob is the angle the user wants.
 
-const SIZE = 220;
+const SIZE = 200;
 const PAD = 22;
 const R = SIZE - PAD * 2;
 const CX = PAD;
@@ -77,8 +77,8 @@ export function AngleDial(props: {
 
   return (
     <View
-      onLayout={(e: LayoutChangeEvent) => setScale(Math.min(e.nativeEvent.layout.width, SIZE) / SIZE)}
-      style={{ alignItems: "center" }}
+      onLayout={(e: LayoutChangeEvent) => setScale(Math.min(e.nativeEvent.layout.width - 96, SIZE) / SIZE)}
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="Window opening angle"
@@ -103,16 +103,22 @@ export function AngleDial(props: {
             <Circle cx={knob.x} cy={knob.y} r={15} fill={colors.accent} />
             <Circle cx={knob.x} cy={knob.y} r={6} fill={colors["accent-text"]} />
           </Svg>
-          <View pointerEvents="none" style={{ position: "absolute", right: 0, bottom: 24 * scale, alignItems: "flex-end" }}>
-            <Text variant="metric" numeric>
-              {props.target}°
-            </Text>
-            <Text variant="caption" tone="muted" numeric>
-              Now {props.actual == null ? "—" : `${props.actual}°`}
-            </Text>
-          </View>
         </View>
       </GestureDetector>
+      <View pointerEvents="none" style={{ width: 88, gap: 2 }}>
+        <Text variant="caption" tone="muted">
+          Target
+        </Text>
+        <Text variant="metric" numeric tone="accent">
+          {props.target}°
+        </Text>
+        <Text variant="caption" tone="muted" numeric style={{ marginTop: 6 }}>
+          Window now
+        </Text>
+        <Text variant="heading" numeric>
+          {props.actual == null ? "—" : `${props.actual}°`}
+        </Text>
+      </View>
     </View>
   );
 }

@@ -11,7 +11,14 @@ import { useTheme } from "@/lib/theme/theme";
  * Scrollable page with the app's margins. Pull-to-refresh reconnects the live stream
  * (the snapshot that follows replaces everything).
  */
-export function Screen(props: { header?: ReactNode; children: ReactNode; refreshable?: boolean; gap?: number }) {
+export function Screen(props: {
+  header?: ReactNode;
+  children: ReactNode;
+  refreshable?: boolean;
+  gap?: number;
+  /** Outside the tabs nothing covers the system navigation bar, so pad for it. */
+  standalone?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const reconnect = useSetAtom(reconnectAtom);
@@ -25,7 +32,7 @@ export function Screen(props: { header?: ReactNode; children: ReactNode; refresh
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: 32, gap: props.gap ?? 16 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 20, paddingBottom: 32 + (props.standalone ? insets.bottom : 0), gap: props.gap ?? 16 }}
         refreshControl={
           props.refreshable ? (
             <RefreshControl
