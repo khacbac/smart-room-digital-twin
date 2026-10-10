@@ -42,7 +42,7 @@ sự thật):
 | Metro: `extraNodeModules` + `disableHierarchicalLookup` (§5 của 01) | Config mặc định của Expo + `blockList` chặn `dashboard/`, `server/`, `device/`, `ml/` | SDK 55 tự hiểu pnpm workspace (isolated); tắt hierarchical lookup làm hỏng cách pnpm đặt dependency bắc cầu |
 | pnpm mặc định "như request-app" | Request-app thật ra dùng `node-linker=hoisted`; repo này giữ isolated, chỉ thêm `react-native-css-interop` làm dependency trực tiếp | Babel của NativeWind chèn import `react-native-css-interop/jsx-runtime`, phải resolve được từ `mobile/` |
 | `react-native-mmkv` (v3) | v4 + `react-native-nitro-modules` | Bản `expo install` chọn cho SDK 55 |
-| `@gorhom/bottom-sheet` cho voice sheet | `app/voice.tsx` là route `transparentModal`, panel tự vẽ + Reanimated | Ít dependency native hơn; không cần snap points |
+| `@gorhom/bottom-sheet` cho voice sheet | `features/voice/components/voice-sheet.tsx` là overlay trong layout tabs (bật bằng `voiceOpenAtom`), panel tự vẽ + Reanimated | Ít dependency native hơn; không cần snap points. Route `transparentModal` (và cả `Modal`) trên Android không che được tab bar |
 | Tab bar mặc định + nút mic nổi | `components/tab-bar.tsx` tự vẽ (2 tab · mic · 2 tab) | Kiểm soát vị trí nút mic và badge |
 | `jotai-effect` cho theo dõi lệnh | `store.sub(commandsAtom)` trong `twin-stream.tsx` | Một dependency ít hơn |
 | Gemini qua `@google/genai` | `fetch` tới REST `generateContent` với `responseSchema` | Không thêm dependency cho server; dễ giả lập trong test |

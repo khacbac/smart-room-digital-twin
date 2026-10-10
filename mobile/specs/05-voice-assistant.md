@@ -200,7 +200,7 @@ qua model thật, in tỉ lệ đúng action + value. Mục tiêu **≥ 90%** đ
 Emulator: phải bật micro host (Extended controls → Microphone → "Virtual microphone uses host audio input"), hoặc
 dùng ô gõ chữ.
 
-## 5. UI: voice sheet (`app/voice.tsx`, `features/voice/components/`)
+## 5. UI: voice sheet (`features/voice/components/voice-sheet.tsx`)
 
 Mở bằng nút mic nổi ở tab bar, rồi **tự bắt đầu nghe**. Bottom sheet cao ~70% màn, nền `surface`, có thể kéo xuống
 để đóng.

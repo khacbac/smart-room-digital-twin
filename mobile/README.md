@@ -64,7 +64,7 @@ Hoặc `pnpm --filter @srdt/mobile build:apk` (EAS build local, cần `eas-cli` 
 ## Cấu trúc
 
 ```
-src/app/            route (expo-router): (tabs) Home/Trends/Controls/Activity, settings, voice (modal)
+src/app/            route (expo-router): (tabs) Home/Trends/Controls/Activity, settings
 src/features/       twin (stream + atoms + room), controls, trends, activity, settings, voice
 src/components/     UI dùng chung (Text, Card, Button, SegmentedControl, TabBar, Toast…)
 src/lib/            api, datasource (SSE), theme (tokens.js), storage (MMKV), haptics, toast

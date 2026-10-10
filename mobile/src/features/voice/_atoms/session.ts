@@ -66,3 +66,6 @@ export const askAssistantAtom = atom(null, async (get, set, text: string): Promi
     return update({ error: errorText(err) });
   }
 });
+
+/** The voice sheet is an overlay in the tabs layout, not a route: a route can't cover the tab bar on Android. */
+export const voiceOpenAtom = atom(false);

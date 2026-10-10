@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Pressable, ScrollView, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import * as Speech from "expo-speech";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Keyboard, Mic, Send, Sparkles, Volume2, X } from "lucide-react-native";
@@ -31,10 +30,13 @@ const SPEECH_ERROR: Record<SpeechError, string> = {
   other: "Something went wrong with the microphone. Try again, or type instead.",
 };
 
-/** Ask the room by voice (or text): the server's assistant answers and sends commands. */
-export default function VoiceSheet() {
-  const router = useRouter();
+/**
+ * Ask the room by voice (or text): the server's assistant answers and sends commands.
+ * Rendered by the tabs layout over everything, tab bar included (see voiceOpenAtom).
+ */
+export function VoiceSheet({ onClose: close }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
   const { colors } = useTheme();
   const [locale, setLocale] = useAtom(voiceLocaleAtom);
   const speak = useAtomValue(voiceSpeakRepliesAtom);
@@ -83,19 +85,22 @@ export default function VoiceSheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => (close(), true));
+    return () => sub.remove();
+  }, [close]);
 
   return (
-    <View style={{ flex: 1, justifyContent: "flex-end" }}>
+    <View style={[StyleSheet.absoluteFill, { justifyContent: "flex-end" }]}>
       <Animated.View entering={FadeIn.duration(200)} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(10,16,12,0.45)" }}>
         <Pressable accessibilityLabel="Close" style={{ flex: 1 }} onPress={close} />
       </Animated.View>
-      <KeyboardAvoidingView behavior="padding">
+      <KeyboardAvoidingView behavior="padding" enabled={typing}>
         <Animated.View
           entering={SlideInDown.duration(280)}
           style={{
-            height: "78%",
-            minHeight: 460,
+            // a number, not "78%": the KeyboardAvoidingView around it has no height to take a percentage of
+            height: Math.max(460, Math.round(window.height * 0.78)),
             backgroundColor: colors.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,

@@ -52,7 +52,6 @@ function Navigator() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: "fade" }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
-        <Stack.Screen name="voice" options={{ presentation: "transparentModal", animation: "none", contentStyle: { backgroundColor: "transparent" } }} />
       </Stack>
     </>
   );

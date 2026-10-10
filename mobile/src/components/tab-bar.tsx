@@ -1,11 +1,12 @@
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import type { LucideIcon } from "lucide-react-native";
 import { Activity, History, House, Mic, SlidersHorizontal } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useSetAtom } from "jotai";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { haptics } from "@/lib/haptics";
 import { useTheme } from "@/lib/theme/theme";
+import { voiceOpenAtom } from "@/features/voice/_atoms/session";
 import { Text } from "./text";
 import { Touchable } from "./touchable";
 
@@ -22,7 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
 export function TabBar({ state, descriptors, navigation, badges }: BottomTabBarProps & { badges: Record<string, boolean> }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const openVoice = useSetAtom(voiceOpenAtom);
 
   const tab = (index: number) => {
     const route = state.routes[index];
@@ -88,7 +89,7 @@ export function TabBar({ state, descriptors, navigation, badges }: BottomTabBarP
           accessibilityLabel="Ask your room by voice"
           onPress={() => {
             haptics.press();
-            router.push("/voice");
+            openVoice(true);
           }}
           style={({ pressed }) => ({
             marginTop: -18,
