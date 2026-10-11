@@ -32,3 +32,4 @@ cloud/firebase/service-account.json
 ml/__pycache__/
 ml/srdt_ml/__pycache__/
 ml/data/gemini+offline.jsonl
+.DS_Store
