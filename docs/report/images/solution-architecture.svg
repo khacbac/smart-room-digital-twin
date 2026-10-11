@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1480 450" role="img" aria-label="Kiến trúc hệ thống: cảm biến và chấp hành nối Node ESP32-S3, Node nối UART tới Gateway ESP32-S3, Gateway gửi telemetry và status lên MQTT Broker Mosquitto, Backend Node.js đọc MQTT, lưu Cloud Firestore và phát SSE cho Dashboard web trên mobile và desktop; lệnh đi ngược từ dashboard qua backend và broker xuống thiết bị" color="#1f2937" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" font-size="14">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+    <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e8590c"/></marker>
+  </defs>
+
+  <!-- zones -->
+  <g fill="none" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="7 5" stroke-width="1.2">
+    <rect x="15" y="150" width="665" height="240" rx="12"/>
+    <rect x="750" y="150" width="450" height="240" rx="12"/>
+    <rect x="1270" y="150" width="190" height="240" rx="12"/>
+  </g>
+  <g fill="currentColor" fill-opacity="0.7" font-size="12" font-weight="600" letter-spacing="1.5">
+    <text x="30" y="174">THIẾT BỊ</text>
+    <text x="765" y="174">SERVER</text>
+    <text x="1285" y="174">NGƯỜI DÙNG</text>
+  </g>
+
+  <!-- boxes -->
+  <g fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5">
+    <rect x="30" y="190" width="160" height="70" rx="8"/>
+    <rect x="30" y="280" width="160" height="70" rx="8"/>
+    <rect x="250" y="190" width="150" height="160" rx="8"/>
+    <rect x="510" y="190" width="150" height="160" rx="8"/>
+    <rect x="770" y="190" width="150" height="160" rx="8"/>
+    <rect x="1030" y="190" width="150" height="160" rx="8"/>
+    <rect x="1290" y="190" width="150" height="160" rx="8"/>
+    <rect x="1030" y="30" width="150" height="70" rx="8"/>
+  </g>
+
+  <!-- box text -->
+  <g fill="currentColor" text-anchor="middle">
+    <text x="110" y="218" font-size="17" font-weight="600">Cảm biến</text>
+    <text x="110" y="243" font-size="12.5">DHT22 · LDR · AQ · PIR</text>
+    <text x="110" y="308" font-size="17" font-weight="600">Chấp hành</text>
+    <text x="110" y="333" font-size="12.5">Servo · còi · LED · LCD</text>
+
+    <text x="325" y="252" font-size="18" font-weight="600">Node</text>
+    <text x="325" y="278">ESP32-S3</text>
+    <text x="325" y="302">Edge rules + TinyML</text>
+
+    <text x="585" y="252" font-size="18" font-weight="600">Gateway</text>
+    <text x="585" y="278">ESP32-S3</text>
+    <text x="585" y="302">Wi-Fi · MQTT</text>
+
+    <text x="845" y="252" font-size="18" font-weight="600">MQTT Broker</text>
+    <text x="845" y="278">Mosquitto</text>
+    <text x="845" y="302">:1883</text>
+
+    <text x="1105" y="252" font-size="18" font-weight="600">Backend</text>
+    <text x="1105" y="278">Node.js · Fastify</text>
+    <text x="1105" y="302">Digital twin</text>
+
+    <text x="1105" y="58" font-size="17" font-weight="600">Cloud Firestore</text>
+    <text x="1105" y="82">lịch sử</text>
+
+    <text x="1365" y="220" font-size="18" font-weight="600">Dashboard</text>
+    <text x="1337" y="336" font-size="12.5">Mobile</text>
+    <text x="1409" y="336" font-size="12.5">Desktop</text>
+  </g>
+
+  <!-- device icons -->
+  <g stroke="currentColor" stroke-width="1.5" fill="none">
+    <rect x="1320" y="240" width="34" height="66" rx="6"/>
+    <rect x="1372" y="248" width="74" height="46" rx="3"/>
+    <rect x="1364" y="298" width="90" height="5" rx="2"/>
+  </g>
+  <g fill="currentColor" fill-opacity="0.15" stroke="none">
+    <rect x="1324" y="246" width="26" height="48" rx="2"/>
+    <rect x="1376" y="252" width="66" height="38"/>
+  </g>
+
+  <!-- arrows -->
+  <g stroke="currentColor" stroke-width="1.8" fill="none">
+    <line x1="190" y1="225" x2="250" y2="225" marker-end="url(#ar)"/>
+    <line x1="250" y1="315" x2="190" y2="315" marker-end="url(#ar)"/>
+    <line x1="400" y1="270" x2="510" y2="270" marker-start="url(#ar)" marker-end="url(#ar)"/>
+    <line x1="660" y1="240" x2="770" y2="240" marker-end="url(#ar)"/>
+    <line x1="920" y1="240" x2="1030" y2="240" marker-end="url(#ar)"/>
+    <line x1="1180" y1="240" x2="1290" y2="240" marker-end="url(#ar)"/>
+    <line x1="1105" y1="190" x2="1105" y2="100" marker-start="url(#ar)" marker-end="url(#ar)"/>
+  </g>
+  <g stroke="#e8590c" stroke-width="1.8" fill="none">
+    <line x1="770" y1="305" x2="660" y2="305" marker-end="url(#arA)"/>
+    <line x1="1030" y1="305" x2="920" y2="305" marker-end="url(#arA)"/>
+    <line x1="1290" y1="305" x2="1180" y2="305" marker-end="url(#arA)"/>
+  </g>
+
+  <!-- arrow labels -->
+  <g fill="currentColor" text-anchor="middle" font-size="13">
+    <text x="455" y="258">UART</text>
+    <text x="715" y="228">telemetry · status</text>
+    <text x="975" y="228">MQTT</text>
+    <text x="1235" y="228">SSE live</text>
+  </g>
+  <g fill="#e8590c" text-anchor="middle" font-size="13">
+    <text x="715" y="325">command</text>
+    <text x="975" y="325">command</text>
+    <text x="1235" y="325">REST</text>
+  </g>
+
+  <!-- legend -->
+  <g stroke-width="1.8" fill="none">
+    <line x1="770" y1="425" x2="810" y2="425" stroke="currentColor" marker-end="url(#ar)"/>
+    <line x1="960" y1="425" x2="1000" y2="425" stroke="#e8590c" marker-end="url(#arA)"/>
+  </g>
+  <g fill="currentColor" font-size="13">
+    <text x="818" y="429">dữ liệu lên</text>
+    <text x="1008" y="429">lệnh xuống</text>
+  </g>
+</svg>

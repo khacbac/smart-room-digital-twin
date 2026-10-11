@@ -188,6 +188,17 @@ a { color: var(--accent); }
 .story .step { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 14.5px; }
 .story .step span { font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--pin-fg); background: var(--pin-bg); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; flex: none; }
 .story p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+/* real screenshots and photos */
+.shot-img { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.phones { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; max-width: none; }
+@media (max-width: 760px) { .phones { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.phones li { margin: 0; display: grid; gap: 6px; align-content: start; font-family: var(--f-display); font-size: 13.5px; color: var(--muted); }
+.phones img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+li .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 520px; }
+.phones b { color: var(--fg); font-weight: 600; }
+.fig-arch { color: var(--fg); }
+.fig-arch svg { font-family: var(--f-display); }
+.fig-arch .cmd { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 html { scroll-behavior: smooth; }
 </style>
@@ -257,7 +268,7 @@ html { scroll-behavior: smooth; }
   </ul>
 
   <h3><span class="n">1.3</span>Phạm vi</h3>
-  <p>Hệ thống giám sát <strong>một phòng</strong>. Thiết bị chạy trên trình mô phỏng <strong>Wokwi</strong> hoặc mạch thật, với hai phương án phần cứng: 1 mạch, hoặc 2 mạch (node cảm biến + gateway mạng). Dữ liệu lưu trong RAM hoặc trên Cloud Firestore. Xác thực người dùng và mã hoá TLS nằm ngoài phạm vi của phiên bản này (xem <a href="#c9">chương 9</a>).</p>
+  <p>Hệ thống giám sát <strong>một phòng</strong>. Thiết bị có hai phương án phần cứng: 1 mạch, hoặc 2 mạch (node cảm biến + gateway mạng). Cả hai chạy được trên trình mô phỏng <strong>Wokwi</strong>; phương án 2 mạch đã được lắp và chạy trên <strong>mạch ESP32-S3 thật</strong> (Ảnh 4.1). Dữ liệu lưu trong RAM hoặc trên Cloud Firestore. Xác thực người dùng và mã hoá TLS nằm ngoài phạm vi của phiên bản này (xem <a href="#c9">chương 9</a>).</p>
 
   <h3><span class="n">1.4</span>Đóng góp chính</h3>
   <ul>
@@ -393,6 +404,101 @@ html { scroll-behavior: smooth; }
   <p class="chlede">Hệ thống được tổ chức theo mô hình kiến trúc IoT nhiều lớp, có thêm một lớp Edge Computing nằm giữa thiết bị và mạng.</p>
 
   <figure>
+    <div class="fig fig-arch">
+      <svg viewBox="0 0 1480 450" role="img" aria-label="Kiến trúc tổng thể: cảm biến và cơ cấu chấp hành nối với Node ESP32-S3; Node nối UART tới Gateway ESP32-S3; Gateway gửi telemetry và status lên MQTT broker Mosquitto; Backend Node.js đọc MQTT, lưu Cloud Firestore và đẩy SSE tới dashboard trên điện thoại và máy tính; lệnh đi ngược từ dashboard qua backend và broker xuống thiết bị." font-size="15">
+        <defs>
+          <marker id="h30" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="h30a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="d-head-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-opacity="0.4" stroke-dasharray="7 5" stroke-width="1.2">
+          <rect x="15" y="150" width="665" height="240" rx="12"/>
+          <rect x="750" y="150" width="450" height="240" rx="12"/>
+          <rect x="1270" y="150" width="190" height="240" rx="12"/>
+        </g>
+        <g fill="currentColor" fill-opacity="0.7" font-size="13" font-weight="600" letter-spacing="1.5">
+          <text x="30" y="174">THIẾT BỊ</text>
+          <text x="765" y="174">SERVER</text>
+          <text x="1285" y="174">NGƯỜI DÙNG</text>
+        </g>
+        <g fill="currentColor" fill-opacity="0.06" stroke="currentColor" stroke-width="1.5">
+          <rect x="30" y="190" width="160" height="70" rx="8"/>
+          <rect x="30" y="280" width="160" height="70" rx="8"/>
+          <rect x="250" y="190" width="150" height="160" rx="8"/>
+          <rect x="510" y="190" width="150" height="160" rx="8"/>
+          <rect x="770" y="190" width="150" height="160" rx="8"/>
+          <rect x="1030" y="190" width="150" height="160" rx="8"/>
+          <rect x="1290" y="190" width="150" height="160" rx="8"/>
+          <rect x="1030" y="30" width="150" height="70" rx="8"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle">
+          <text x="110" y="218" font-size="17" font-weight="600">Cảm biến</text>
+          <text x="110" y="243" font-size="12.5">DHT22 · LDR · AQ · PIR</text>
+          <text x="110" y="308" font-size="17" font-weight="600">Chấp hành</text>
+          <text x="110" y="333" font-size="12.5">Servo · còi · LED · LCD</text>
+          <text x="325" y="252" font-size="18" font-weight="600">Node</text>
+          <text x="325" y="278">ESP32-S3</text>
+          <text x="325" y="302">Edge rules + TinyML</text>
+          <text x="585" y="252" font-size="18" font-weight="600">Gateway</text>
+          <text x="585" y="278">ESP32-S3</text>
+          <text x="585" y="302">Wi-Fi · MQTT</text>
+          <text x="845" y="252" font-size="18" font-weight="600">MQTT Broker</text>
+          <text x="845" y="278">Mosquitto</text>
+          <text x="845" y="302">:1883</text>
+          <text x="1105" y="252" font-size="18" font-weight="600">Backend</text>
+          <text x="1105" y="278">Node.js · Fastify</text>
+          <text x="1105" y="302">Digital twin</text>
+          <text x="1105" y="58" font-size="17" font-weight="600">Cloud Firestore</text>
+          <text x="1105" y="82">lịch sử</text>
+          <text x="1365" y="220" font-size="18" font-weight="600">Dashboard</text>
+          <text x="1337" y="336" font-size="12.5">Mobile</text>
+          <text x="1409" y="336" font-size="12.5">Desktop</text>
+        </g>
+        <g stroke="currentColor" stroke-width="1.5" fill="none">
+          <rect x="1320" y="240" width="34" height="66" rx="6"/>
+          <rect x="1372" y="248" width="74" height="46" rx="3"/>
+          <rect x="1364" y="298" width="90" height="5" rx="2"/>
+        </g>
+        <g fill="currentColor" fill-opacity="0.15" stroke="none">
+          <rect x="1324" y="246" width="26" height="48" rx="2"/>
+          <rect x="1376" y="252" width="66" height="38"/>
+        </g>
+        <g stroke="currentColor" stroke-width="1.8" fill="none">
+          <line x1="190" y1="225" x2="250" y2="225" marker-end="url(#h30)"/>
+          <line x1="250" y1="315" x2="190" y2="315" marker-end="url(#h30)"/>
+          <line x1="400" y1="270" x2="510" y2="270" marker-start="url(#h30)" marker-end="url(#h30)"/>
+          <line x1="660" y1="240" x2="770" y2="240" marker-end="url(#h30)"/>
+          <line x1="920" y1="240" x2="1030" y2="240" marker-end="url(#h30)"/>
+          <line x1="1180" y1="240" x2="1290" y2="240" marker-end="url(#h30)"/>
+          <line x1="1105" y1="190" x2="1105" y2="100" marker-start="url(#h30)" marker-end="url(#h30)"/>
+        </g>
+        <g class="d-acc" stroke-width="1.8">
+          <line x1="770" y1="305" x2="660" y2="305" marker-end="url(#h30a)"/>
+          <line x1="1030" y1="305" x2="920" y2="305" marker-end="url(#h30a)"/>
+          <line x1="1290" y1="305" x2="1180" y2="305" marker-end="url(#h30a)"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13">
+          <text x="455" y="258">UART</text>
+          <text x="715" y="212">telemetry</text><text x="715" y="228">status</text>
+          <text x="975" y="228">MQTT</text>
+          <text x="1235" y="228">SSE live</text>
+        </g>
+        <g class="d-head-acc" text-anchor="middle" font-size="13">
+          <text x="715" y="325">command</text>
+          <text x="975" y="325">command</text>
+          <text x="1235" y="325">REST</text>
+        </g>
+        <line x1="770" y1="425" x2="810" y2="425" stroke="currentColor" stroke-width="1.8" marker-end="url(#h30)"/>
+        <line class="d-acc" x1="960" y1="425" x2="1000" y2="425" stroke-width="1.8" marker-end="url(#h30a)"/>
+        <g fill="currentColor" font-size="13">
+          <text x="818" y="429">dữ liệu lên</text>
+          <text x="1008" y="429">lệnh xuống</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption><b>Hình 3.1.</b> Kiến trúc tổng thể theo phương án 2 mạch. Dữ liệu đi từ trái sang phải; lệnh của người dùng (màu nhấn) đi ngược lại qua đúng các chặng đó. Backend là điểm duy nhất nối tới Cloud Firestore và tới các client.</figcaption>
+  </figure>
+
+  <figure>
     <div class="fig">
       <svg viewBox="0 0 1000 640" role="img" aria-label="Kiến trúc 6 lớp: Perception, Edge Computing, Network, Middleware, Application, Business. Dữ liệu đi lên gồm số đo, trạng thái, sự kiện và xác nhận; lệnh điều khiển đi xuống.">
         <defs>
@@ -462,7 +568,7 @@ html { scroll-behavior: smooth; }
         <text class="d-acc-t" transform="translate(970 340) rotate(-90)" text-anchor="middle">đi xuống: lệnh điều khiển</text>
       </svg>
     </div>
-    <figcaption><b>Hình 3.1.</b> Sáu lớp và các thành phần chính của từng lớp. Lớp Edge (viền cam) là điểm khác biệt của hệ thống: quyết định an toàn được đưa ra ở đây, không phải trên server. Dữ liệu đi lên bên trái, lệnh đi xuống bên phải.</figcaption>
+    <figcaption><b>Hình 3.2.</b> Sáu lớp và các thành phần chính của từng lớp. Lớp Edge (viền cam) là điểm khác biệt của hệ thống: quyết định an toàn được đưa ra ở đây, không phải trên server. Dữ liệu đi lên bên trái, lệnh đi xuống bên phải.</figcaption>
   </figure>
 
   <h3><span class="n">3.1</span>Mỗi lớp làm gì, dùng công nghệ nào</h3>
@@ -539,12 +645,28 @@ html { scroll-behavior: smooth; }
   <p>Firmware còn có bản cho bộ kit ESP32 phổ thông (DHT11, OLED, relay thay servo). Sơ đồ chân chi tiết ở <a href="#pc">Phụ lục C</a>.</p>
 
   <figure>
-    <div class="shot">
-      <div class="tag">Ảnh chụp · Phase 2</div>
-      <div class="what">Ảnh 4.1 — Mạch 1 board trên Wokwi ở trạng thái DANGER</div>
-      <div class="how">Chạy mô phỏng 1 mạch trong Wokwi, kéo nhiệt độ DHT22 lên 35 °C. Chụp khi LED đỏ sáng, servo mở 90° và LCD hiện "DANGER".</div>
+    <div class="art">
+      <img src="images/web/08-board-real.jpg" width="1800" height="802" loading="lazy" alt="Ảnh chụp mạch thật trên breadboard: hai bo ESP32-S3 cắm USB, một còi, ba LED xanh vàng đỏ, cảm biến nhiệt độ độ ẩm màu xanh dương, biến trở, module cảm biến ánh sáng và một nút nhấn lớn màu vàng. LED trạng thái trên bo bên phải đang sáng xanh.">
+      <span class="pin" style="left:33%;top:12%">1</span>
+      <span class="pin" style="left:66%;top:14%">2</span>
+      <span class="pin" style="left:23%;top:42%">3</span>
+      <span class="pin" style="left:33%;top:70%">4</span>
+      <span class="pin" style="left:44%;top:46%">5</span>
+      <span class="pin" style="left:49%;top:77%">6</span>
+      <span class="pin" style="left:63%;top:50%">7</span>
+      <span class="pin" style="left:73%;top:40%">8</span>
     </div>
-    <figcaption><b>Ảnh 4.1.</b> Mạch mô phỏng với đầy đủ cảm biến và cơ cấu chấp hành.</figcaption>
+    <ul class="legend">
+      <li><span class="k">1</span>ESP32-S3 node<span class="p">bộ xử lý</span></li>
+      <li><span class="k">2</span>ESP32-S3 gateway<span class="p">mạng</span></li>
+      <li><span class="k">3</span>Buzzer<span class="p">chấp hành</span></li>
+      <li><span class="k">4</span>LED xanh / vàng / đỏ<span class="p">hiển thị</span></li>
+      <li><span class="k">5</span>Cảm biến nhiệt độ, độ ẩm<span class="p">cảm biến</span></li>
+      <li><span class="k">6</span>Biến trở (giả lập AQ)<span class="p">cảm biến</span></li>
+      <li><span class="k">7</span>Module LDR<span class="p">cảm biến</span></li>
+      <li><span class="k">8</span>Nút nhấn<span class="p">đầu vào</span></li>
+    </ul>
+    <figcaption><b>Ảnh 4.1.</b> Phương án 2 mạch lắp thật trên một breadboard. Node (1) đọc cảm biến và điều khiển còi, LED; gateway (2) lo Wi-Fi và MQTT, LED trạng thái trên bo đang sáng xanh nghĩa là đã kết nối broker. LED xanh lá (4) đang sáng: phòng ở mức NORMAL.</figcaption>
   </figure>
 
   <h3><span class="n">4.2</span>Tổ chức firmware</h3>
@@ -721,14 +843,7 @@ flowchart LR
 
   <p>Gateway là một <span class="term">transparent bridge</span>: nó không đọc nội dung bản tin, chỉ lo đăng ký node khi node khởi động, theo dõi sự sống hai chiều (mất node quá 15 s thì báo offline thay cho node), đồng bộ giờ cho node (vì node không có Internet) và báo trạng thái qua LED: đỏ = chưa có Wi-Fi, vàng = chưa có MQTT, xanh = sẵn sàng, nháy = mất node.</p>
 
-  <figure>
-    <div class="shot">
-      <div class="tag">Ảnh chụp · Phase 2</div>
-      <div class="what">Ảnh 5.1 — Hai mạch Wokwi (node + gateway) nối qua splice</div>
-      <div class="how">Chạy hai mạch Wokwi (node và gateway) cùng công cụ nối hai mạch. Chụp hai mạch cạnh nhau, LED gateway xanh, cửa sổ log thấy bản tin đi qua lại.</div>
-    </div>
-    <figcaption><b>Ảnh 5.1.</b> Phương án 2 mạch chạy trên mô phỏng.</figcaption>
-  </figure>
+  <p>Ảnh 4.1 là phương án này khi lắp thật: hai bo ESP32-S3 trên cùng một breadboard, LED trạng thái của gateway đang sáng xanh.</p>
 
   <h3><span class="n">5.2</span>Giao thức truyền giữa node và gateway</h3>
   <figure>
@@ -771,25 +886,21 @@ flowchart LR
     <thead><tr><th>Kênh</th><th>Hướng</th><th>QoS / retain</th><th>Nội dung</th></tr></thead>
     <tbody>
       <tr><td>Số đo (telemetry)</td><td>lên</td><td class="num">0</td><td>Số đo + trạng thái + cơ cấu chấp hành, mỗi 2 s và ngay khi đổi trạng thái</td></tr>
-      <tr><td>Trạng thái (status)</td><td>lên</td><td class="num">1 · retained</td><td>Online + cơ cấu chấp hành, khi đổi và mỗi 30 s; kèm LWT báo offline</td></tr>
+      <tr><td>Trạng thái (status)</td><td>lên</td><td class="num">0 · retained<br>(LWT: 1 · retained)</td><td>Online + cơ cấu chấp hành, khi đổi và mỗi 30 s; kèm LWT báo offline</td></tr>
       <tr><td>Sự kiện (event)</td><td>lên</td><td class="num">0</td><td>Khởi động, đổi trạng thái, lỗi cảm biến, đặt override…</td></tr>
       <tr><td>Lệnh (command)</td><td>xuống</td><td class="num">1</td><td>Lệnh điều khiển, mỗi lệnh có mã riêng</td></tr>
       <tr><td>Xác nhận lệnh (ack)</td><td>lên</td><td class="num">0</td><td>Đã thực hiện / từ chối / lỗi</td></tr>
     </tbody>
   </table></div>
   <ul>
-    <li><strong>QoS 0</strong> (at most once) cho telemetry: mất một bản tin không sao vì bản tin mới đến ngay sau đó. <strong>QoS 1</strong> (at least once) cho lệnh và status: phải đến nơi, nếu trùng thì phía nhận tự lọc.</li>
+    <li><strong>QoS 0</strong> (at most once) cho telemetry: mất một bản tin không sao vì bản tin mới đến ngay sau đó. <strong>QoS 1</strong> (at least once) cho lệnh và bản tin LWT: phải đến nơi, nếu trùng thì phía nhận tự lọc. Thư viện MQTT trên ESP32 (PubSubClient) chỉ publish được QoS 0, nên status thường ngày đi QoS 0 kèm cờ retained; mất một bản thì 30 s sau có bản mới.</li>
     <li><strong>Retained message:</strong> broker giữ lại status cuối cùng, nên client vừa kết nối nhận được trạng thái ngay, không phải chờ 30 s.</li>
     <li><strong>Last Will and Testament (LWT):</strong> thiết bị gửi trước cho broker một bản tin "tôi đã offline". Nếu thiết bị chết đột ngột, broker tự phát bản tin này sau khoảng 20–25 s.</li>
   </ul>
 
   <figure>
-    <div class="shot">
-      <div class="tag">Ảnh chụp · Phase 2</div>
-      <div class="what">Ảnh 5.2 — Luồng MQTT thực tế</div>
-      <div class="how">Mở công cụ theo dõi MQTT khi thiết bị đang chạy, rồi gửi một lệnh từ dashboard. Chụp màn hình thấy đủ số đo, trạng thái, lệnh và xác nhận.</div>
-    </div>
-    <figcaption><b>Ảnh 5.2.</b> Các bản tin MQTT nhìn từ broker.</figcaption>
+    <img class="shot-img" src="images/web/09-mqtt-broker-log.jpg" width="951" height="477" loading="lazy" alt="Log của broker Mosquitto: thiết bị dev-room-01 publish telemetry 299 byte QoS 0 lên srdt/room-01/telemetry mỗi 2 giây, publish status 274 byte có cờ retained; broker chuyển tiếp từng bản tin tới các client backend srdt-server; xen giữa là các cặp PINGREQ và PINGRESP giữ kết nối.">
+    <figcaption><b>Ảnh 5.2.</b> Log của broker Mosquitto khi mạch thật đang chạy. Thiết bị <span class="mono">dev-room-01</span> gửi telemetry (299 byte, <span class="mono">q0</span>) mỗi 2 s và status có cờ retained (<span class="mono">r1</span>); broker chuyển tiếp từng bản tới backend (<span class="mono">srdt-server-…</span>). Các cặp PINGREQ / PINGRESP là cơ chế keep-alive mà LWT dựa vào để phát hiện thiết bị chết.</figcaption>
   </figure>
 </section>
 
@@ -902,7 +1013,7 @@ sequenceDiagram
   BE-->>UI: cập nhật live (SSE) → twin hiện cửa 45°
 </pre>
     </div>
-    <figcaption><b>Hình 6.3.</b> Đường đi của lệnh mở cửa 45°. Với phương án 1 mạch thì bỏ chặng gateway. Thời gian đo được từ "Đã gửi" tới "Đã thực hiện" với thiết bị giả khoảng 3 ms.</figcaption>
+    <figcaption><b>Hình 6.3.</b> Đường đi của lệnh mở cửa 45°. Với phương án 1 mạch thì bỏ chặng gateway. Trên mạch thật (2 mạch, Wi-Fi trong LAN), thời gian từ "Đã gửi" tới "Đã thực hiện" có trung vị khoảng 0.3 s (mục 8.4).</figcaption>
   </figure>
 
   <h3><span class="n">6.4</span>Lưu trữ</h3>
@@ -938,24 +1049,20 @@ sequenceDiagram
   <h3><span class="n">7.1</span>Dashboard web</h3>
   <p>Viết bằng Next.js, xuất dạng static. Dashboard gồm thẻ số đo (tô màu theo ngưỡng), bản vẽ phòng (twin SVG: góc cửa, còi, trạng thái), biểu đồ 15 phút có đường ngưỡng, bảng điều khiển với đếm ngược override, scenes và nhật ký sự kiện. Dữ liệu được tải một lần khi mở trang, sau đó cập nhật liên tục qua luồng live SSE.</p>
   <figure>
-    <div class="shot">
-      <div class="tag">Ảnh chụp · Phase 2</div>
-      <div class="what">Ảnh 7.1 — Dashboard ở trạng thái NORMAL và DANGER</div>
-      <div class="how">Chạy backend, dashboard và thiết bị giả. Chụp một ảnh lúc phòng bình thường và một ảnh sau kịch bản khói (DANGER, cửa 90°, còi bật). Nên chụp thêm một ảnh có nhãn "manual" và đếm ngược override.</div>
-    </div>
-    <figcaption><b>Ảnh 7.1.</b> Digital twin trên web.</figcaption>
+    <img class="shot-img" src="images/web/10-dashboard-twin.jpg" width="1800" height="2275" loading="lazy" alt="Dashboard web ở chế độ Live twin: hàng thẻ số đo (22.7 °C, 64 %, 1008 lux, AQ 115, có người), dải trạng thái phòng Normal với cửa 90° và chế độ điều khiển Window đếm ngược 1:27, bản vẽ twin của phòng với cửa sổ đang mở và một người đứng trong phòng, biểu đồ nhiệt độ 15 phút, bảng điều khiển cửa sổ, còi, màn hình của mạch và nhật ký các lệnh override.">
+    <figcaption><b>Ảnh 7.1.</b> Dashboard web nối với mạch thật. Cửa sổ vừa được mở tay nên đang ở chế độ override: dải trạng thái hiện "Window (1:27)", tức còn 1 phút 27 giây trước khi trả quyền về edge. Bản vẽ twin phản chiếu cửa đang mở và có người trong phòng, đúng như cảm biến PIR báo lên.</figcaption>
   </figure>
 
   <h3><span class="n">7.2</span>App Android</h3>
   <p>Viết bằng Expo / React Native, gồm 4 tab: <strong>Home</strong> (twin + số đo), <strong>Controls</strong> (cửa sổ, còi, scenes, bảng mạch), <strong>Trends</strong> (biểu đồ) và <strong>Activity</strong> (sự kiện), cộng thêm màn Settings. App nhận cập nhật live giống dashboard và lưu cài đặt ngay trên máy.</p>
   <figure>
-    <div class="shots">
-      <div class="shot"><div class="tag">Phase 2</div><div class="what">Home</div><div class="how">Twin + thẻ số đo</div></div>
-      <div class="shot"><div class="tag">Phase 2</div><div class="what">Controls</div><div class="how">Góc cửa, scenes</div></div>
-      <div class="shot"><div class="tag">Phase 2</div><div class="what">Trends</div><div class="how">Biểu đồ 15 phút</div></div>
-      <div class="shot"><div class="tag">Phase 2</div><div class="what">Voice</div><div class="how">Đang nghe + thẻ kết quả lệnh</div></div>
-    </div>
-    <figcaption><b>Ảnh 7.2.</b> Bốn màn chính của app, chụp trên emulator Android.</figcaption>
+    <ul class="phones">
+      <li><img src="images/web/11-app-home.jpg" width="540" height="960" loading="lazy" alt="Màn Home: thẻ Room condition Normal, cửa 0° đóng, còi tắt, chế độ Automatic, Room intelligence Normal active; bên dưới là thẻ nhiệt độ 24.1 °C và độ ẩm 65 % kèm đường xu hướng."><b>Home</b>trạng thái phòng và số đo</li>
+      <li><img src="images/web/12-app-controls.jpg" width="540" height="960" loading="lazy" alt="Màn Controls: vòng chọn góc cửa đặt 45°, cửa hiện tại 45°, nhãn Manual, thông báo Open window completed in 0.5 s."><b>Controls</b>lệnh mở cửa 45° hoàn tất sau 0.5 s</li>
+      <li><img src="images/web/13-app-trends.jpg" width="540" height="960" loading="lazy" alt="Màn Trends: biểu đồ nhiệt độ 15 phút từ 22 đến 26 °C, hiện tại 23.6, thấp nhất 23.6, trung bình 24.0, cao nhất 24.3 °C."><b>Trends</b>biểu đồ 15 phút và thống kê</li>
+      <li><img src="images/web/14-app-activity.jpg" width="540" height="960" loading="lazy" alt="Màn Activity: danh sách sự kiện hôm nay gồm các lần đặt override cửa sổ từ dashboard, một lần khởi động lại mạch và một lần override hết hạn."><b>Activity</b>nhật ký sự kiện của thiết bị</li>
+    </ul>
+    <figcaption><b>Ảnh 7.2.</b> Bốn màn chính của app, chụp trên emulator Android khi đang nối với mạch thật. Ở màn Controls, thời gian 0.5 s được tính từ lúc bấm tới lúc nhận xác nhận (ack) của thiết bị.</figcaption>
   </figure>
 
   <h3><span class="n">7.3</span>Trợ lý giọng nói</h3>
@@ -1046,8 +1153,15 @@ sequenceDiagram
 
   <h3><span class="n">8.4</span>Kết quả thực nghiệm</h3>
   <ul>
-    <li>Luồng end-to-end thiết bị → dashboard → lệnh ngược lại chạy được cả với 1 mạch và 2 mạch trên Wokwi.</li>
-    <li>Lệnh mở cửa 45° được thiết bị xác nhận khoảng 3 ms sau khi gửi (thiết bị giả, chạy trên máy local).</li>
+    <li>Luồng end-to-end thiết bị → dashboard → lệnh ngược lại chạy được với 1 mạch và 2 mạch trên Wokwi, và với 2 mạch ESP32-S3 thật (Ảnh 4.1).</li>
+    <li>Độ trễ lệnh trên mạch thật, đo trên 20 lệnh liên tiếp (mở/đóng cửa, bật/tắt còi), tất cả đều được thực hiện:
+      <div class="kpis">
+        <div class="kpi"><div class="v">0.29 s</div><div class="l">Trung vị: broker nhận → thiết bị xác nhận</div></div>
+        <div class="kpi"><div class="v">0.24–0.44 s</div><div class="l">Khoảng dao động của chặng trên</div></div>
+        <div class="kpi"><div class="v">0.40 s</div><div class="l">Trung vị: người bấm → thiết bị xác nhận</div></div>
+        <div class="kpi"><div class="v">20 / 20</div><div class="l">Lệnh ở trạng thái "Đã thực hiện"</div></div>
+      </div>
+      Với thiết bị giả chạy trên máy local, chặng broker → xác nhận chỉ khoảng 3 ms; phần chênh lệch trên mạch thật là thời gian đi qua Wi-Fi, gateway và chặng UART tới node.</li>
     <li>Rút dây link 20 s: sau 15 s dashboard báo offline, nối lại thì online.</li>
     <li>Tắt broker: thiết bị kết nối lại với backoff 1–16 s, mỗi lần mất kết nối chỉ kết nối lại đúng một lần.</li>
     <li>TinyML: kịch bản nóng ẩm → UNCOMFORTABLE, cửa 45° (rule engine vẫn để 0°); AQ 627 có người → cửa 60°.</li>
@@ -1071,7 +1185,7 @@ sequenceDiagram
     <tbody>
       <tr><td>Xác thực người dùng</td><td><span class="status-no">chưa có</span></td><td>Firebase Auth cho dashboard, app và API</td></tr>
       <tr><td>Bảo mật broker</td><td><span class="status-no">chưa TLS</span>, chỉ chạy trong LAN</td><td>TLS + user/password (HiveMQ Cloud, EMQX hoặc Mosquitto trên VM)</td></tr>
-      <tr><td>2 mạch thật</td><td><span class="status-part">mới chạy trên Wokwi</span></td><td>Chạy theo checklist nối dây UART (M3)</td></tr>
+      <tr><td>2 mạch thật</td><td><span class="status-done">đã chạy</span> trên breadboard, nguồn USB</td><td>Đóng hộp, chạy liên tục nhiều ngày để đo độ ổn định</td></tr>
       <tr><td>Triển khai cloud</td><td><span class="status-part">Firestore xong</span>; Hosting, Cloud Run mới là mock</td><td>Deploy backend lên Cloud Run, dashboard lên Firebase Hosting</td></tr>
       <tr><td>Nhiều node</td><td><span class="status-part">1 node / gateway</span></td><td>Gateway đa node, hoặc ESP-NOW thay UART</td></tr>
       <tr><td>Buffer khi mất mạng</td><td><span class="status-no">bỏ telemetry</span> khi offline</td><td>Lưu tạm trên flash, gửi bù khi có mạng</td></tr>
@@ -1114,21 +1228,18 @@ sequenceDiagram
 <!-- ============ B ============ -->
 <section class="ch" id="pb">
   <h2><span class="n">B</span>Kế hoạch hình ảnh</h2>
-  <p>Báo cáo dùng ba loại hình. <strong>Minh hoạ</strong> (tạo bằng AI, không chứa chữ; nhãn được đặt bằng HTML để luôn chính xác) giúp nắm ý trực giác. <strong>Sơ đồ</strong> (vẽ vector) thể hiện chính xác cơ chế. <strong>Ảnh chụp</strong> thật sẽ được thêm ở Phase 2, thay vào các khung nét đứt ở trên.</p>
+  <p>Báo cáo dùng ba loại hình. <strong>Minh hoạ</strong> (tạo bằng AI, không chứa chữ; nhãn được đặt bằng HTML để luôn chính xác) giúp nắm ý trực giác. <strong>Sơ đồ</strong> (vẽ vector) thể hiện chính xác cơ chế. <strong>Ảnh chụp</strong> lấy từ mạch thật, broker, dashboard và app khi hệ thống đang chạy.</p>
   <div class="tbl"><table>
     <thead><tr><th>Hình</th><th>Loại</th><th>Trạng thái</th></tr></thead>
     <tbody>
       <tr><td>1.1 Cloud-only và edge-first · 2.1 Digital twin · 2.2 Câu chuyện 4 bước</td><td>Minh hoạ AI</td><td><span class="status-done">xong</span></td></tr>
       <tr><td>4.1 Giải phẫu căn phòng · 5.2 Hai mạch · 7.1 Giọng nói · ảnh bìa</td><td>Minh hoạ AI</td><td><span class="status-done">xong</span></td></tr>
-      <tr><td>2.3 Vòng khép kín · 3.1 Kiến trúc 6 lớp</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>2.3 Vòng khép kín · 3.1 Kiến trúc tổng thể · 3.2 Kiến trúc 6 lớp</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
       <tr><td>4.2 State machine · 4.3 Pipeline TinyML</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
       <tr><td>5.1 Hai phương án · 5.3 Cấu trúc gói tin</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
       <tr><td>6.1 Ingest · 6.2 Vòng đời lệnh · 6.3 Downlink · 7.2 Trợ lý giọng nói</td><td>Sơ đồ</td><td><span class="status-done">xong</span></td></tr>
-      <tr><td>Ảnh 4.1 Mạch Wokwi 1 board</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · tự chụp trong VS Code</span></td></tr>
-      <tr><td>Ảnh 5.1 Hai mạch Wokwi</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · tự chụp trong VS Code</span></td></tr>
-      <tr><td>Ảnh 5.2 Luồng MQTT</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · chụp terminal</span></td></tr>
-      <tr><td>Ảnh 7.1 Dashboard</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · có thể tự động hoá</span></td></tr>
-      <tr><td>Ảnh 7.2 App Android</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · chụp trên emulator</span></td></tr>
+      <tr><td>Ảnh 4.1 Mạch thật 2 bo · 5.2 Log broker</td><td>Ảnh chụp</td><td><span class="status-done">xong</span></td></tr>
+      <tr><td>Ảnh 7.1 Dashboard · 7.2 App Android</td><td>Ảnh chụp</td><td><span class="status-done">xong</span></td></tr>
       <tr><td>Ảnh 8.1 Firestore console</td><td>Ảnh chụp</td><td><span class="status-part">Phase 2 · cần đăng nhập</span></td></tr>
     </tbody>
   </table></div>
@@ -1175,7 +1286,7 @@ sequenceDiagram
     <thead><tr><th>Topic</th><th>QoS / retain</th><th>Ghi chú</th></tr></thead>
     <tbody>
       <tr><td><code>srdt/{deviceId}/telemetry</code></td><td class="num">0</td><td>mỗi 2 s</td></tr>
-      <tr><td><code>srdt/{deviceId}/status</code></td><td class="num">1 · retained</td><td>LWT <code>{"online":false}</code></td></tr>
+      <tr><td><code>srdt/{deviceId}/status</code></td><td class="num">0 · retained (LWT: 1)</td><td>LWT <code>{"online":false}</code></td></tr>
       <tr><td><code>srdt/{deviceId}/event</code></td><td class="num">0</td><td><code>BOOT</code>, <code>STATE_CHANGED</code>, <code>SENSOR_FAULT</code>, <code>OVERRIDE_SET</code>…</td></tr>
       <tr><td><code>srdt/{deviceId}/command</code></td><td class="num">1</td><td><code>OPEN_WINDOW</code> (1–90), <code>CLOSE_WINDOW</code>, <code>BUZZER_ON</code>, <code>BUZZER_OFF</code>, <code>CLEAR_OVERRIDE</code>, <code>IDENTIFY</code>, <code>SHOW_MESSAGE</code></td></tr>
       <tr><td><code>srdt/{deviceId}/command/ack</code></td><td class="num">0</td><td><code>executed</code> / <code>rejected</code> / <code>failed</code></td></tr>
