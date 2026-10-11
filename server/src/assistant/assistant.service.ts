@@ -12,11 +12,14 @@ import {
 import type { CommandService } from "../commands/command.service";
 import { RateLimiter } from "../commands/rate-limit";
 import type { Logger } from "../logger";
-import { AssistantPlan, type AssistantModel, type RoomContext } from "./model";
+import { buildHistory, HISTORY_MAX_DAYS, localTime, type PastData, type RoomHistory } from "./history";
+import { AssistantPlan, type AssistantModel, type PlanInput, type RoomContext } from "./model";
 import { reply } from "./replies";
 
 // One utterance → one model call → checked commands through the normal CommandService
 // (validation, rate limit, ack tracking, live push to every client), with source "ai".
+// A question about the past takes two calls (rarely three): the model first asks for
+// `historyDays`, the service loads that much history and asks again with it.
 
 export type AssistantErrorCode = "ASSISTANT_DISABLED" | "ASSISTANT_TIMEOUT" | "ASSISTANT_UPSTREAM" | "RATE_LIMITED";
 
@@ -33,7 +36,13 @@ export interface AssistantServiceOptions {
   timeoutMs: number;
   /** Utterances per minute per device; separate from the commands/min limit. */
   perMinute?: number;
+  /** IANA zone the user lives in: "yesterday" and the history rows are in local time. */
+  timeZone?: string;
+  /** Hourly rollups, events and commands since a date; without it, history questions get a fixed reply. */
+  loadPast?: (deviceCode: string, since: Date) => Promise<PastData>;
 }
+
+const DEFAULT_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 const ERROR_CODE = {
   device_offline: "DEVICE_OFFLINE",
@@ -65,10 +74,28 @@ export class AssistantService {
     if (!this.limiter.allow(device.code, this.now()))
       throw new AssistantError("RATE_LIMITED", "at most 20 assistant requests per minute per device");
 
-    const room = toRoomContext(device, await this.latestTelemetry(device.code).catch(() => null), this.now());
+    const timeZone = this.opts.timeZone ?? DEFAULT_TIME_ZONE;
+    const room = toRoomContext(device, await this.latestTelemetry(device.code).catch(() => null), this.now(), timeZone);
     const started = this.now();
-    const plan = await this.planWithRetry({ text: req.text, locale: req.locale, history: req.history, room });
+    const input: PlanInput = { text: req.text, locale: req.locale, history: req.history, room };
+    let plan = await this.planWithRetry(input);
     const log = this.log.child({ device: device.code, model: this.model.name });
+
+    // A plan that asks for history is only a request for data: its commands are not sent.
+    // With the history in hand the model may still ask again ("last week" read as 14 days,
+    // or simply a placeholder reply): one more round, with a longer history if it wants one.
+    let past: RoomHistory | null = null;
+    for (let round = 0; round < 2 && plan.historyDays != null; round++) {
+      const days = Math.min(HISTORY_MAX_DAYS, Math.max(1, Math.ceil(plan.historyDays)));
+      if (!past || days > past.days) {
+        past = await this.past(device.code, days, timeZone);
+        if (!past) {
+          log.info({ text: req.text, historyDays: days }, "assistant answered without history");
+          return { intent: "query", reply: reply(req.locale, "noHistory"), commands: [], pendingConfirmation: [], expectsAnswer: false };
+        }
+      }
+      plan = await this.planWithRetry({ ...input, past });
+    }
 
     const pendingConfirmation: AssistantResponse["pendingConfirmation"] = [];
     const results: AssistantCommandResult[] = [];
@@ -110,10 +137,23 @@ export class AssistantService {
     else if (plan.commands.length > 0 && planned.length === 0) text = reply(req.locale, "alreadyDone");
 
     log.info(
-      { text: req.text, intent: plan.intent, actions: plan.commands.map((c) => c.action), ms: this.now() - started },
+      { text: req.text, intent: plan.intent, actions: plan.commands.map((c) => c.action), historyDays: past?.days ?? null, ms: this.now() - started },
       "assistant answered",
     );
     return { intent: plan.intent, reply: text, commands: results, pendingConfirmation, expectsAnswer };
+  }
+
+  /** null when there is no history source or it failed. */
+  private async past(deviceCode: string, days: number, timeZone: string) {
+    if (!this.opts.loadPast) return null;
+    const now = this.now();
+    try {
+      const data = await this.opts.loadPast(deviceCode, new Date(now - days * 24 * 3_600_000));
+      return buildHistory(data, days, now, timeZone);
+    } catch (err) {
+      this.log.warn({ err, device: deviceCode, days }, "assistant history not loaded");
+      return null;
+    }
   }
 
   /** Model output that is not a valid plan gets one more try, then 502. */
@@ -176,11 +216,17 @@ export function normalise(commands: AssistantPlan["commands"], room: RoomContext
   return out;
 }
 
-export function toRoomContext(device: DeviceRecord, live: TelemetryRecord | null, now: number): RoomContext {
+export function toRoomContext(
+  device: DeviceRecord,
+  live: TelemetryRecord | null,
+  now: number,
+  timeZone = DEFAULT_TIME_ZONE,
+): RoomContext {
   const reported = device.reported;
   const expires = reported?.override.expiresAt ? Date.parse(reported.override.expiresAt) : null;
   return {
     deviceName: device.name,
+    localTime: `${localTime(now, timeZone)} (${timeZone})`,
     online: device.presence === "online",
     edgeState: live?.edgeState ?? device.edgeState,
     mlState: live?.mlState ?? null,

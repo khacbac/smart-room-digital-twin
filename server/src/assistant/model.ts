@@ -5,6 +5,7 @@ import {
   type AssistantTurn,
   type EdgeState,
 } from "@srdt/contracts";
+import type { RoomHistory } from "./history";
 
 // What the assistant's language model decides for one utterance. The model never sends
 // anything itself: AssistantService checks the plan and creates the commands.
@@ -26,9 +27,14 @@ export const AssistantPlan = z.object({
   commands: z
     .array(z.object({ action: AssistantAction, value: z.number().nullable(), text: z.string().nullish() }))
     .max(2),
-  reply: z.string().trim().min(1).max(400),
+  reply: z.string().trim().min(1).max(600),
   /** The reply asks the user something, so the app should listen for the answer. */
   expectsAnswer: z.boolean().default(false),
+  /**
+   * The answer needs past data: how many days back (clamped to 1..HISTORY_MAX_DAYS by the
+   * service). The service then asks again with `PlanInput.past`; ignored on that second call.
+   */
+  historyDays: z.number().nullish(),
 });
 export type AssistantPlan = z.infer<typeof AssistantPlan>;
 /** A plan before defaults (expectsAnswer may be left out). */
@@ -37,6 +43,8 @@ export type AssistantPlanInput = z.input<typeof AssistantPlan>;
 /** A compact summary of the twin for the prompt (never the whole telemetry history). */
 export interface RoomContext {
   deviceName: string;
+  /** Local wall-clock time, `Sat 2026-10-11 15:04 (Asia/Ho_Chi_Minh)`, so "yesterday" means something. */
+  localTime?: string;
   online: boolean;
   edgeState: EdgeState | null;
   mlState: EdgeState | null;
@@ -57,6 +65,8 @@ export interface PlanInput {
   locale: AssistantLocale;
   history: AssistantTurn[];
   room: RoomContext;
+  /** Present on the second call, after the model asked for `historyDays`. */
+  past?: RoomHistory;
 }
 
 export interface AssistantModel {

@@ -45,6 +45,18 @@ const Env = z.object({
   /** Empty = the provider's default (DEFAULT_ASSISTANT_MODEL). */
   ASSISTANT_MODEL: z.string().optional(),
   ASSISTANT_TIMEOUT_SEC: positive.default(10),
+  /** IANA time zone of the users: the assistant reads "yesterday" and history rows in it. */
+  ASSISTANT_TIME_ZONE: z
+    .string()
+    .refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "unknown IANA time zone")
+    .default("Asia/Ho_Chi_Minh"),
 }).superRefine((env, ctx) => {
   // Fail at boot rather than on the first write, once MQTT messages are already arriving.
   if (env.STORAGE_DRIVER === "firestore" && !env.GCP_PROJECT_ID) {

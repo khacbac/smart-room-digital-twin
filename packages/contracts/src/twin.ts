@@ -54,6 +54,38 @@ export interface TelemetryRecord {
   aiControl: boolean;
 }
 
+/** min/max/sum over the samples that had a reading (`count` of them). */
+export interface MetricStat {
+  min: number;
+  max: number;
+  sum: number;
+  count: number;
+}
+
+/**
+ * Every telemetry message of one device in one UTC hour, folded into counters (before the
+ * storage downsampling, so short spikes are kept). A month is ~720 of these per device,
+ * which is what the assistant reads to answer questions about the past.
+ */
+export interface TelemetryRollup {
+  /** The hour's start, `2026-10-11T08` (UTC); also the document id. */
+  hour: string;
+  deviceCode: string;
+  samples: number;
+  temperature: MetricStat | null;
+  humidity: MetricStat | null;
+  light: MetricStat | null;
+  airQuality: MetricStat | null;
+  /** Samples per edge state. */
+  states: Record<EdgeState, number>;
+  /** Samples with motion / window open / buzzer sounding / manual override. */
+  presence: number;
+  windowOpen: number;
+  buzzer: number;
+  override: number;
+  updatedAt: string;
+}
+
 export interface EventRecord {
   id: string;
   deviceCode: string;

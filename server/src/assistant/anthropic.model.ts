@@ -1,5 +1,5 @@
 import type { AssistantModel, PlanInput } from "./model";
-import { PLAN_JSON_SCHEMA, roomText, systemPrompt } from "./prompt";
+import { PLAN_JSON_SCHEMA, systemPrompt, userMessage } from "./prompt";
 
 // Claude through the Messages API. The plan comes back as the input of a forced tool call,
 // so it is always JSON shaped like AssistantPlan. Plain fetch, like GeminiModel.
@@ -21,7 +21,7 @@ export class AnthropicModel implements AssistantModel {
   async plan(input: PlanInput, signal: AbortSignal): Promise<unknown> {
     const messages = [
       ...input.history.map((t) => ({ role: t.role === "user" ? "user" : "assistant", content: t.text })),
-      { role: "user", content: `${roomText(input.room)}\n\nUSER SAID: ${input.text}` },
+      { role: "user", content: userMessage(input) },
     ];
     const res = await this.fetchFn(ENDPOINT, {
       method: "POST",
@@ -33,7 +33,7 @@ export class AnthropicModel implements AssistantModel {
       },
       body: JSON.stringify({
         model: this.model,
-        max_tokens: 512,
+        max_tokens: 1024,
         system: systemPrompt(input.locale),
         messages,
         tools: [{ name: TOOL, description: "Answer the user: intent, commands to send, spoken reply.", input_schema: PLAN_JSON_SCHEMA }],

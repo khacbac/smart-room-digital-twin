@@ -15,6 +15,7 @@ import { createMessageHandler } from "./mqtt/handlers";
 import { RealtimeHub } from "./realtime/hub";
 import { startServerRules } from "./rules/server-rules";
 import { createStorage } from "./storage";
+import { RollupService } from "./telemetry/rollup.service";
 import { Downsampler, TelemetryService } from "./telemetry/telemetry.service";
 
 // Wiring: MQTT → ingestion → services → storage + SSE hub → dashboard;
@@ -48,11 +49,13 @@ async function main() {
     process.exit(1);
   }
 
+  const rollups = new RollupService(storage.rollups, log);
   const telemetry = new TelemetryService(
     storage.telemetry,
     hub,
     new Downsampler(config.TELEMETRY_PERSIST_INTERVAL_SEC * 1000),
     log,
+    rollups,
   );
 
   // The handler needs `commands`, which needs the MQTT link: bind it late.
@@ -92,7 +95,18 @@ async function main() {
     model,
     commands,
     async (code) => (await telemetry.recent(code, new Date(Date.now() - 5 * 60_000), 1))[0] ?? null,
-    { timeoutMs: config.ASSISTANT_TIMEOUT_SEC * 1000 },
+    {
+      timeoutMs: config.ASSISTANT_TIMEOUT_SEC * 1000,
+      timeZone: config.ASSISTANT_TIME_ZONE,
+      loadPast: async (code, since) => {
+        const [hourly, history, sent] = await Promise.all([
+          rollups.since(code, since.toISOString().slice(0, 13)),
+          events.recent(code, 500, since),
+          storage.commands.recent(code, 500, since),
+        ]);
+        return { rollups: hourly, events: history, commands: sent };
+      },
+    },
     log.child({ module: "assistant" }),
   );
   const app = await buildApi({
@@ -126,6 +140,7 @@ async function main() {
     stopRules();
     hub.close(); // SSE responses never end on their own, and app.close() waits for them
     await Promise.allSettled([app.close(), mqtt.close()]);
+    await rollups.flushAll();
     await storage.close().catch(() => undefined);
     process.exit(0);
   };

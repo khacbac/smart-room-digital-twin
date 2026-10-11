@@ -106,8 +106,9 @@ server/src/assistant/
 ├─ model.ts               interface AssistantModel + AssistantPlan (zod)
 ├─ gemini.model.ts        @google/genai, structured output (responseSchema), timeout qua AbortSignal
 ├─ rules.model.ts         model không cần mạng, theo từ khoá (test + demo offline)
-├─ prompt.ts              system prompt + format trạng thái phòng
-└─ replies.ts             câu trả lời mẫu (vi/en) cho lỗi: offline, rate limit, broker, không hiểu
+├─ prompt.ts              system prompt + format trạng thái phòng (+ lịch sử khi có)
+├─ history.ts             gộp rollup theo giờ + event + command (≤ 30 ngày) thành bảng ngắn cho prompt
+└─ replies.ts             câu trả lời mẫu (vi/en) cho lỗi: offline, rate limit, broker, không hiểu, không đọc được lịch sử
 ```
 
 ### 3.1 Interface
@@ -116,12 +117,14 @@ server/src/assistant/
 export const AssistantPlan = z.object({
   intent: z.enum(["command", "query", "clarify", "unsupported"]),
   commands: z.array(z.object({ action: CommandAction, value: z.number().nullable() })).max(2),
-  reply: z.string().min(1).max(400),
+  reply: z.string().min(1).max(600),
+  expectsAnswer: z.boolean().default(false),
+  historyDays: z.number().nullish(), // cần lịch sử bao nhiêu ngày (§3.3b)
 });
 
 export interface AssistantModel {
   readonly name: string;
-  plan(input: { text: string; locale: AssistantLocale; history: AssistantTurn[]; room: RoomContext },
+  plan(input: { text: string; locale: AssistantLocale; history: AssistantTurn[]; room: RoomContext; past?: RoomHistory },
        signal: AbortSignal): Promise<AssistantPlan>;
 }
 ```
@@ -138,7 +141,8 @@ twin-core) để LLM giải thích được "vì sao Warning".
 | `GEMINI_API_KEY` | (trống) | Thiếu key mà provider `gemini` → endpoint trả `503` |
 | `ANTHROPIC_API_KEY` | (trống) | Như trên, cho provider `anthropic` (Claude, tool call bắt buộc thay cho responseSchema) |
 | `ASSISTANT_MODEL` | trống = mặc định của provider (`gemini-3-flash-preview` / `claude-haiku-5-5`) | Cần nhanh (< 2 s), không cần bản Pro như lúc gán nhãn dữ liệu ML |
-| `ASSISTANT_TIMEOUT_SEC` | `10` | |
+| `ASSISTANT_TIMEOUT_SEC` | `10` | Cho mỗi lần gọi model; câu hỏi về quá khứ gọi 2 lần (app chờ tối đa 30 s) |
+| `ASSISTANT_TIME_ZONE` | `Asia/Ho_Chi_Minh` | "hôm qua", "tuần này" và các dòng lịch sử tính theo giờ địa phương này |
 
 ### 3.3 Prompt (nội dung chính, viết ở `prompt.ts`)
 
@@ -163,6 +167,26 @@ twin-core) để LLM giải thích được "vì sao Warning".
 - Trả lời đúng ngôn ngữ `locale`, giọng thân thiện, ngắn vì sẽ được đọc to. Không dùng markdown, emoji.
 - `reply` viết như thể lệnh **đang được thực hiện** ("Mình đang mở cửa sổ 45 độ."), vì ack về sau.
 - Thiết bị offline → không đề xuất lệnh, `reply` báo thiết bị đang offline.
+
+### 3.3b Phạm vi câu hỏi và dữ liệu lịch sử
+
+- **Ngoài phạm vi** (kiến thức chung, thời tiết bên ngoài, tin tức, toán, code, kể chuyện, tư vấn…): `unsupported`,
+  không lệnh, `expectsAnswer: false`; lịch sự nói đây là ngoài phạm vi của trợ lý phòng và kể ngắn những gì làm
+  được. Không trả lời câu hỏi đó, kể cả một phần. Khác với thiết bị phòng không có (đèn, quạt…) — vẫn đề nghị việc
+  gần nhất như trên.
+- Chào hỏi, "bạn là ai / làm được gì", hỏi hệ thống hoạt động thế nào (state, ngưỡng, AI trên mạch, chế độ tay
+  2 phút) → `query`, trả lời ngắn.
+- **Lịch sử ≤ 30 ngày.** `RoomContext` chỉ là số đo mới nhất (+ giờ địa phương hiện tại). Câu hỏi về quá khứ
+  ("tháng vừa rồi có gì bất thường không", "hôm qua nóng nhất mấy giờ", "tuần này còi có kêu không"):
+  1. Lần gọi 1: model trả `historyDays` (1–30) + câu đệm, không lệnh.
+  2. Server đọc rollup theo giờ (`devices/{code}/rollups`, gộp từ mọi telemetry nên không mất đỉnh ngắn), event
+     và command trong khoảng đó, tóm thành bảng: cả kỳ + từng ngày (≤ 2 ngày thì từng giờ) với min/tb/max,
+     % thời gian ở từng state, % mở cửa, có người, còi; số giờ có dữ liệu; các lần mất kết nối (ghép
+     OFFLINE → ONLINE); ≤ 40 event đáng chú ý; số lệnh lỗi.
+  3. Lần gọi 2: cùng câu hỏi + phần `HISTORY` → model trả lời bằng ngày + số liệu, ≤ 3 câu. Nếu model vẫn xin
+     thêm (VD "tuần trước" hiểu là 14 ngày) → tải dài hơn / hỏi lại đúng 1 lần nữa. Lệnh trong plan xin dữ liệu
+     không bao giờ được gửi.
+  - Không đọc được lịch sử → câu mẫu `noHistory`.
 
 ### 3.4 Xử lý sau khi có plan
 
@@ -192,9 +216,12 @@ phép), không đi qua LLM lần nữa.
 - Model treo → `504` sau timeout (dùng fake timers).
 - Rate limit lượt hỏi → `429`.
 - Lệnh tạo ra có `source: "ai"` và được publish lên hub (dashboard thấy).
+- `historyDays` → tải lịch sử (kẹp 1–30) và hỏi lại với `past`; lệnh của plan đầu không gửi; xin thêm → 1 vòng nữa;
+  không đọc được → `noHistory` (`server/test/history.test.ts` cho rollup + bảng lịch sử).
 
 Eval với LLM thật: `server/scripts/assistant-eval.ts` chạy bảng §6 (lưu ở `server/scripts/assistant-eval.jsonl`)
-qua model thật, in tỉ lệ đúng action + value. Mục tiêu **≥ 90%** đúng action, value lệch ≤ 5°.
+qua model thật, in tỉ lệ đúng action + value. Mục tiêu **≥ 90%** đúng action, value lệch ≤ 5°. Các câu có
+`"strict": true` còn kiểm intent (câu ngoài phạm vi, câu hỏi lịch sử), `"history"` kiểm model có xin `historyDays`.
 
 ## 4. App: nhận diện và đọc giọng nói
 

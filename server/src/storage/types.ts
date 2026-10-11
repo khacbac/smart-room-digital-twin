@@ -4,6 +4,7 @@ import type {
   DeviceRecord,
   EventRecord,
   TelemetryRecord,
+  TelemetryRollup,
 } from "@srdt/contracts";
 
 // Storage boundary of the backend. Services only talk to these interfaces, so the
@@ -30,10 +31,19 @@ export interface TelemetryStore {
   recent(deviceCode: string, since: Date, limit: number): Promise<TelemetryRecord[]>;
 }
 
+/** Hourly telemetry rollups, one document per device and hour (`TelemetryRollup.hour`). */
+export interface RollupStore {
+  /** Creates or replaces the device's rollup for `rollup.hour`. */
+  put(rollup: TelemetryRollup): Promise<void>;
+  get(deviceCode: string, hour: string): Promise<TelemetryRollup | null>;
+  /** Oldest first, `hour >= sinceHour`. */
+  since(deviceCode: string, sinceHour: string): Promise<TelemetryRollup[]>;
+}
+
 export interface EventStore {
   append(record: EventRecord): Promise<void>;
-  /** Newest first. */
-  recent(deviceCode: string, limit: number): Promise<EventRecord[]>;
+  /** Newest first; only `createdAt >= since` when given. */
+  recent(deviceCode: string, limit: number, since?: Date): Promise<EventRecord[]>;
 }
 
 export type NewCommand = Pick<CommandRecord, "deviceCode" | "action" | "value" | "text" | "source">;
@@ -53,14 +63,15 @@ export interface CommandStore {
   get(id: string): Promise<CommandRecord | null>;
   /** `pending | sent` created before `before` (timeout sweep). */
   listOpenBefore(before: Date): Promise<CommandRecord[]>;
-  /** Newest first. */
-  recent(deviceCode: string, limit: number): Promise<CommandRecord[]>;
+  /** Newest first; only `createdAt >= since` when given. */
+  recent(deviceCode: string, limit: number, since?: Date): Promise<CommandRecord[]>;
 }
 
 export interface Storage {
   readonly driver: string;
   devices: DeviceStore;
   telemetry: TelemetryStore;
+  rollups: RollupStore;
   events: EventStore;
   commands: CommandStore;
   /** Health check for `/health`. */

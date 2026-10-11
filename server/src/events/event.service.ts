@@ -62,8 +62,9 @@ export class EventService implements ServerEventSink {
     });
   }
 
-  recent(deviceCode: string, limit: number): Promise<EventRecord[]> {
-    return this.store.recent(deviceCode, limit);
+  /** Newest first; only `createdAt >= since` when given. */
+  recent(deviceCode: string, limit: number, since?: Date): Promise<EventRecord[]> {
+    return this.store.recent(deviceCode, limit, since);
   }
 
   private async save(record: EventRecord): Promise<void> {

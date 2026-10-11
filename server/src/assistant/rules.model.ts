@@ -1,5 +1,6 @@
 import { AQ_LINES, HUMIDITY_LINES, TEMP_LINES, levelFor } from "@srdt/twin-core";
 import type { AssistantLocale, EdgeState } from "@srdt/contracts";
+import type { RoomHistory } from "./history";
 import type { AssistantModel, AssistantPlan, AssistantPlanInput, PlanInput, RoomContext } from "./model";
 
 // Keyword planner that needs no network or API key: for tests, offline demos and as the
@@ -38,6 +39,9 @@ const VAGUE = /\b(lam gi do|gi do|something|anything)\b/;
 const IDENTIFY = /\b(nhay den|bao hieu|dinh vi|o dau|identify|blink|where are you|which (board|device))\b/;
 const SCREEN = /\b(man hinh|screen|lcd|oled)\b/;
 const SHOW = /\b(hien thi|hien|ghi|viet|show|display|write|put)\b/;
+const PAST = /\b(hom qua|dem qua|tuan|thang|gan day|vua roi|vua qua|bat thuong|lich su|trung binh|yesterday|last (night|week|month)|this (week|month)|recently|history|unusual|anomal(y|ies)|average)\b/;
+const OFF_TOPIC = /\b(thoi tiet|du bao|tin tuc|bong da|chung khoan|gia vang|ke chuyen|chuyen cuoi|bai hat|nau an the nao|cong thuc|dich|giai toan|lap trinh|weather|forecast|news|football|stocks?|joke|story|song|recipe|translate|math|coding|president|who won)\b/;
+const ABOUT = /\b(lam duoc gi|lam duoc nhung gi|giup duoc gi|ban la ai|what can you do|who are you)\b/;
 
 /** "Hiển thị Xin chào lên màn hình" → "Xin chào"; a quoted text wins. */
 function messageFrom(text: string): string {
@@ -100,10 +104,40 @@ function explain(room: RoomContext, locale: AssistantLocale): string {
   return t(locale, `Vì ${reasons.join(" và ")}, vượt ngưỡng cảnh báo.`, `Because ${reasons.join(" and ")}, above the alert thresholds.`);
 }
 
+function pastDays(s: string): number {
+  if (has(s, /\b(hom qua|dem qua|yesterday|last night)\b/)) return 2;
+  if (has(s, /\b(tuan|week)\b/)) return 7;
+  return 30;
+}
+
+const RANK = { NORMAL: 0, UNCOMFORTABLE: 1, WARNING: 2, DANGER: 3 } as const;
+
+function summarise(h: RoomHistory, locale: AssistantLocale): string {
+  if (!h.overall) return t(locale, `Mình không có dữ liệu nào trong ${h.days} ngày qua.`, `I have no readings from the last ${h.days} days.`);
+  const bad = h.rows.filter((r) => r.states.WARNING + r.states.DANGER > 0);
+  const worst = (["DANGER", "WARNING", "UNCOMFORTABLE"] as const).find((s) => (h.overall?.states[s] ?? 0) > 0);
+  const temp = h.overall.temperature;
+  const tempText = temp ? t(locale, `nhiệt độ từ ${temp.min.toFixed(1)} đến ${temp.max.toFixed(1)} độ C`, `temperature ranged ${temp.min.toFixed(1)} to ${temp.max.toFixed(1)} °C`) : "";
+  const faults = (h.eventCounts.SENSOR_FAULT ?? 0) + (h.eventCounts.DEVICE_OFFLINE ?? 0);
+  if (!worst || RANK[worst] < RANK.WARNING) {
+    return t(
+      locale,
+      `${h.days} ngày qua phòng không có gì bất thường, ${tempText}${faults ? `, có ${faults} lần lỗi cảm biến hoặc mất kết nối` : ""}.`,
+      `Nothing unusual in the last ${h.days} days; ${tempText}${faults ? `, with ${faults} sensor faults or disconnects` : ""}.`,
+    );
+  }
+  const labels = bad.slice(-3).map((r) => r.label);
+  return t(
+    locale,
+    `${h.days} ngày qua có ${bad.length} lúc phòng ở mức ${worst === "DANGER" ? "nguy hiểm" : "cảnh báo"}, gần nhất: ${labels.join(", ")}. Cả kỳ ${tempText}.`,
+    `In the last ${h.days} days the room reached ${worst} in ${bad.length} periods, latest: ${labels.join(", ")}. Overall ${tempText}.`,
+  );
+}
+
 export class RulesModel implements AssistantModel {
   readonly name = "rules";
 
-  async plan({ text, locale, room, history }: PlanInput): Promise<AssistantPlanInput> {
+  async plan({ text, locale, room, history, past }: PlanInput): Promise<AssistantPlanInput> {
     const s = fold(text);
     const say = (vi: string, en: string) => t(locale, vi, en);
 
@@ -114,6 +148,29 @@ export class RulesModel implements AssistantModel {
         intent: "command",
         commands: [{ action: "OPEN_WINDOW", value: 45 }],
         reply: say("Mình đang mở cửa sổ 45 độ. Chế độ tay giữ 2 phút.", "Opening the window to 45 degrees. Manual mode lasts 2 minutes."),
+      };
+
+    if (has(s, PAST)) {
+      if (past) return { intent: "query", commands: [], reply: summarise(past, locale) };
+      return { intent: "query", commands: [], reply: say("Để mình xem lịch sử.", "Let me check the history."), historyDays: pastDays(s) };
+    }
+    if (has(s, ABOUT))
+      return {
+        intent: "query",
+        commands: [],
+        reply: say(
+          "Mình là trợ lý của phòng: xem số đo và lịch sử 30 ngày, mở đóng cửa sổ, tắt bật còi và hiện chữ lên màn hình.",
+          "I'm the room assistant: I read the sensors and the last 30 days, open or close the window, handle the alarm and write on the screen.",
+        ),
+      };
+    if (has(s, OFF_TOPIC))
+      return {
+        intent: "unsupported",
+        commands: [],
+        reply: say(
+          "Xin lỗi, câu này nằm ngoài phạm vi của mình. Mình chỉ giúp được về căn phòng: số đo, lịch sử 30 ngày, cửa sổ, còi và màn hình.",
+          "Sorry, that's outside what I can help with. I can only help with this room: its readings, the last 30 days, the window, the alarm and the screen.",
+        ),
       };
 
     if (has(s, SCREEN) && has(s, SHOW) && room.online) {

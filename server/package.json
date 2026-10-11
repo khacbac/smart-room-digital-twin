@@ -11,7 +11,8 @@
     "test:firestore": "firebase emulators:exec --project srdt-contract-test --config ../cloud/firebase/firebase.json --only firestore 'vitest run'",
     "typecheck": "tsc -p tsconfig.json",
     "fake-device": "tsx scripts/fake-device.ts",
-    "assistant-eval": "tsx scripts/assistant-eval.ts"
+    "assistant-eval": "tsx scripts/assistant-eval.ts",
+    "backfill-rollups": "tsx scripts/backfill-rollups.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

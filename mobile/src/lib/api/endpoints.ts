@@ -34,8 +34,8 @@ export function listDevices(baseUrl: string) {
 }
 
 export function askAssistant(deviceCode: string, body: AssistantRequest) {
-  // the server gives the model 10 s; leave room for the round trip
+  // the server gives each model call 10 s and a question about the past takes two calls
   return request<AssistantResponse>("POST", `/api/devices/${encodeURIComponent(deviceCode)}/assistant`, body, {
-    timeoutMs: 15_000,
+    timeoutMs: 30_000,
   });
 }

@@ -22,3 +22,11 @@
 {"text":"Trong phòng có mùi khét quá","locale":"vi-VN","intent":"command","commands":[{"action":"OPEN_WINDOW","value":90}]}
 {"text":"Bật quạt lên giúp mình","locale":"vi-VN","intent":"unsupported","commands":[]}
 {"text":"Ồn quá, im đi","locale":"vi-VN","room":{"buzzer":true},"intent":"command","commands":[{"action":"BUZZER_OFF","value":null}]}
+{"text":"Tháng vừa rồi phòng có gì bất thường không?","locale":"vi-VN","intent":"query","commands":[],"strict":true,"history":true}
+{"text":"Hôm qua phòng nóng nhất bao nhiêu độ?","locale":"vi-VN","intent":"query","commands":[],"strict":true,"history":true}
+{"text":"Has the alarm gone off this week?","locale":"en-US","intent":"query","commands":[],"strict":true,"history":true}
+{"text":"Bây giờ phòng bao nhiêu độ?","locale":"vi-VN","intent":"query","commands":[],"strict":true,"history":false}
+{"text":"Thời tiết Hà Nội ngày mai thế nào?","locale":"vi-VN","intent":"unsupported","commands":[],"strict":true,"history":false}
+{"text":"Kể cho mình một câu chuyện cười đi","locale":"vi-VN","intent":"unsupported","commands":[],"strict":true}
+{"text":"Who won the World Cup in 2022?","locale":"en-US","intent":"unsupported","commands":[],"strict":true}
+{"text":"Bạn làm được những gì?","locale":"vi-VN","intent":"query","commands":[],"strict":true}

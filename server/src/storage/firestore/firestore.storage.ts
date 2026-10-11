@@ -8,8 +8,8 @@ import {
   type QuerySnapshot,
   type Transaction,
 } from "firebase-admin/firestore";
-import type { CommandRecord, CommandStatus, DeviceRecord, EventRecord, TelemetryRecord } from "@srdt/contracts";
-import type { CommandStore, DeviceStore, EventStore, NewCommand, Storage, TelemetryStore } from "../types";
+import type { CommandRecord, CommandStatus, DeviceRecord, EventRecord, TelemetryRecord, TelemetryRollup } from "@srdt/contracts";
+import type { CommandStore, DeviceStore, EventStore, NewCommand, RollupStore, Storage, TelemetryStore } from "../types";
 
 // Cloud Firestore driver. Same observable behaviour as the in-memory driver (see
 // memory/memory.storage.ts), so services never learn which one they are talking to.
@@ -17,6 +17,7 @@ import type { CommandStore, DeviceStore, EventStore, NewCommand, Storage, Teleme
 //
 //   devices/{code}
 //   devices/{code}/telemetry/{bootId}-{seq}   id is derived, so an MQTT redelivery is idempotent
+//   devices/{code}/rollups/{hour}             hourly telemetry counters, hour = 2026-10-11T08 (UTC)
 //   devices/{code}/events/{id}
 //   commands/{id}                             flat, with a `deviceCode` field
 //
@@ -81,6 +82,28 @@ class FirestoreTelemetry implements TelemetryStore {
   }
 }
 
+class FirestoreRollups implements RollupStore {
+  constructor(private readonly db: Firestore) {}
+
+  private col(deviceCode: string) {
+    return this.db.collection("devices").doc(deviceCode).collection("rollups");
+  }
+
+  async put(rollup: TelemetryRollup) {
+    await this.col(rollup.deviceCode).doc(rollup.hour).set(rollup);
+  }
+
+  async get(deviceCode: string, hour: string) {
+    const snap = await this.col(deviceCode).doc(hour).get();
+    return snap.exists ? data<TelemetryRollup>(snap) : null;
+  }
+
+  async since(deviceCode: string, sinceHour: string) {
+    const snap = await this.col(deviceCode).where("hour", ">=", sinceHour).orderBy("hour").get();
+    return rows<TelemetryRollup>(snap);
+  }
+}
+
 class FirestoreEvents implements EventStore {
   constructor(private readonly db: Firestore) {}
 
@@ -92,9 +115,10 @@ class FirestoreEvents implements EventStore {
     await this.col(record.deviceCode).doc(record.id).set(record);
   }
 
-  async recent(deviceCode: string, limit: number) {
-    const snap = await this.col(deviceCode).orderBy("createdAt", "desc").limit(limit).get();
-    return rows<EventRecord>(snap);
+  async recent(deviceCode: string, limit: number, since?: Date) {
+    let query = this.col(deviceCode).orderBy("createdAt", "desc");
+    if (since) query = query.where("createdAt", ">=", since.toISOString());
+    return rows<EventRecord>(await query.limit(limit).get());
   }
 }
 
@@ -162,13 +186,11 @@ class FirestoreCommands implements CommandStore {
     return rows<CommandRecord>(snap);
   }
 
-  async recent(deviceCode: string, limit: number) {
-    const snap = await this.col
-      .where("deviceCode", "==", deviceCode)
-      .orderBy("createdAt", "desc")
-      .limit(limit)
-      .get();
-    return rows<CommandRecord>(snap);
+  async recent(deviceCode: string, limit: number, since?: Date) {
+    // the (deviceCode, createdAt desc) index serves the range as well
+    let query = this.col.where("deviceCode", "==", deviceCode).orderBy("createdAt", "desc");
+    if (since) query = query.where("createdAt", ">=", since.toISOString());
+    return rows<CommandRecord>(await query.limit(limit).get());
   }
 }
 
@@ -193,6 +215,7 @@ export function createFirestoreStorage(opts: FirestoreOptions, now: () => number
     driver: "firestore",
     devices: new FirestoreDevices(db),
     telemetry: new FirestoreTelemetry(db),
+    rollups: new FirestoreRollups(db),
     events: new FirestoreEvents(db),
     commands: new FirestoreCommands(db, now),
     async ping() {

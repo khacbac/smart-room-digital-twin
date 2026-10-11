@@ -19,6 +19,7 @@ Các shape đã có sẵn trong `packages/contracts/src/twin.ts` (camelCase, tim
 |---|---|---|---|
 | `devices/{code}` | device code (`room-01`) | `DeviceRecord` | `reported` = status mới nhất; `lastSeenAt` chỉ ghi ≤ 1 lần / 15 s |
 | `devices/{code}/telemetry/{id}` | `{bootId}-{seq}` | `TelemetryRecord` | id cố định ⇒ ghi trùng là idempotent; đã downsample ~1 doc / 5 s |
+| `devices/{code}/rollups/{hour}` | giờ UTC (`2026-10-11T08`) | `TelemetryRollup` | min/max/tổng mỗi cảm biến + số mẫu theo state trong 1 giờ, gộp từ **mọi** telemetry (trước downsample); trợ lý đọc khi hỏi về quá khứ (≤ 30 ngày ≈ 720 doc) |
 | `devices/{code}/events/{id}` | `{bootId}-{seq}` hoặc uuid | `EventRecord` | |
 | `commands/{id}` | uuid | `CommandRecord` | có field `deviceCode`; `transition()` = transaction |
 
@@ -34,6 +35,7 @@ Số đo thật, 1 device, đo bằng listener Firestore trong 3–4 phút (khô
 | `telemetry.append` (`TELEMETRY_PERSIST_INTERVAL_SEC=15`) | 5 280 /ngày | 5 400 /ngày |
 | `devices.put` | **8 640 /ngày** | **1 080 /ngày** |
 | events + commands (lúc idle) | 0 | 0 |
+| `rollups.put` (ghi giờ đang chạy mỗi 10 phút + lúc hết giờ) | – | ~170 /ngày |
 | **Tổng** | **13 920 /ngày/device** | **6 480 /ngày/device** |
 
 Trước khi sửa, `devices.put` tốn nhiều hơn cả telemetry — 1 device đã ăn 70 % hạn mức.
@@ -47,6 +49,11 @@ card và room twin không chậm đi, chỉ chart lịch sử thưa hơn.
 
 Không dùng TTL policy: TTL của Firestore yêu cầu field kiểu `Timestamp`, mà ta cố ý lưu timestamp
 dạng ISO string (xem §3.4). Với quy mô đồ án thì không cần.
+
+Đọc: mỗi câu hỏi về quá khứ của trợ lý đọc ≤ 720 rollup + ≤ 500 event + ≤ 500 command (thường ít
+hơn nhiều), tức vài chục câu / ngày vẫn trong hạn mức 50 000 reads. Telemetry thô không bao giờ bị đọc
+lại cho việc này. Dữ liệu có từ trước khi có rollup: `pnpm --filter @srdt/server backfill-rollups`
+(đọc telemetry đã lưu một lần, ghi lại các giờ đã qua).
 
 Index cần: xem `cloud/firebase/firestore.indexes.json` (commands theo `deviceCode + createdAt`, và
 `status + createdAt` cho sweep timeout).

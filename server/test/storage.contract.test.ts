@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
-import type { DeviceRecord, EventRecord, TelemetryRecord } from "@srdt/contracts";
+import type { DeviceRecord, EventRecord, TelemetryRecord, TelemetryRollup } from "@srdt/contracts";
 import { createFirestoreStorage } from "../src/storage/firestore/firestore.storage";
 import { DEFAULT_MEMORY_LIMITS, createMemoryStorage } from "../src/storage/memory/memory.storage";
 import type { Storage } from "../src/storage/types";
@@ -72,6 +72,24 @@ function event(code: string, id: string, createdAt: string): EventRecord {
     data: { from: "NORMAL", to: "WARNING", nested: { ok: true } },
     measuredAt: createdAt,
     createdAt,
+  };
+}
+
+function rollup(code: string, hour: string, samples: number): TelemetryRollup {
+  return {
+    hour,
+    deviceCode: code,
+    samples,
+    temperature: { min: 24, max: 31, sum: 27 * samples, count: samples },
+    humidity: null,
+    light: { min: 100, max: 300, sum: 200 * samples, count: samples },
+    airQuality: { min: 90, max: 400, sum: 150 * samples, count: samples },
+    states: { NORMAL: samples, UNCOMFORTABLE: 0, WARNING: 0, DANGER: 0 },
+    presence: 1,
+    windowOpen: 0,
+    buzzer: 0,
+    override: 0,
+    updatedAt: at(0),
   };
 }
 
@@ -164,6 +182,25 @@ for (const driver of drivers) {
       expect(stored[1]).toEqual(first);
 
       expect((await storage.events.recent(code, 1)).map((e) => e.id)).toEqual([second.id]);
+      // `since` is inclusive on `createdAt`
+      expect((await storage.events.recent(code, 10, new Date(clock.ms + 1000))).map((e) => e.id)).toEqual([second.id]);
+    });
+
+    it("stores hourly rollups, replaces an hour and lists them from an hour on", async () => {
+      const code = newCode();
+      await storage.rollups.put(rollup(code, "2026-09-30T09", 10));
+      await storage.rollups.put(rollup(code, "2026-09-30T08", 5));
+      await storage.rollups.put(rollup(code, "2026-09-30T10", 1));
+      await storage.rollups.put(rollup(code, "2026-09-30T10", 7)); // same hour: replaced
+
+      expect(await storage.rollups.get(code, "2026-09-30T10")).toEqual(rollup(code, "2026-09-30T10", 7));
+      expect(await storage.rollups.get(code, "2026-09-30T11")).toBeNull();
+      const since = await storage.rollups.since(code, "2026-09-30T09");
+      expect(since.map((r) => [r.hour, r.samples])).toEqual([
+        ["2026-09-30T09", 10],
+        ["2026-09-30T10", 7],
+      ]);
+      expect(await storage.rollups.since(newCode(), "2026-09-30T00")).toEqual([]);
     });
 
     it("creates commands pending, with a UUID id", async () => {
@@ -273,6 +310,7 @@ for (const driver of drivers) {
 
       expect((await storage.commands.recent(code, 10)).map((c) => c.id)).toEqual([second.id, first.id]);
       expect((await storage.commands.recent(code, 1)).map((c) => c.id)).toEqual([second.id]);
+      expect((await storage.commands.recent(code, 10, new Date(clock.ms + 1000))).map((c) => c.id)).toEqual([second.id]);
       expect(await storage.commands.recent(newCode(), 10)).toEqual([]);
     });
   });

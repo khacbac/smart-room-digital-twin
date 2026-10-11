@@ -19,6 +19,10 @@ interface Case {
   room?: Partial<RoomContext>;
   intent: string;
   commands: { action: string; value: number | null }[];
+  /** Also require this intent (off-topic and history cases, where no command shows the decision). */
+  strict?: boolean;
+  /** The first plan must (true) or must not (false) ask for history. */
+  history?: boolean;
 }
 
 const BASE_ROOM: RoomContext = {
@@ -78,12 +82,14 @@ for (const c of cases) {
     const got = normalise(plan.commands, room);
     const match =
       got.length === c.commands.length &&
-      c.commands.every((want) => got.some((g) => g.action === want.action && (want.value === null || Math.abs((g.value ?? 0) - want.value) <= 5)));
+      c.commands.every((want) => got.some((g) => g.action === want.action && (want.value === null || Math.abs((g.value ?? 0) - want.value) <= 5))) &&
+      (!c.strict || plan.intent === c.intent) &&
+      (c.history === undefined || (plan.historyDays != null) === c.history);
     if (match) {
       ok++;
       verdict = "ok  ";
     }
-    detail = `${plan.intent} ${JSON.stringify(got)} — ${plan.reply}`;
+    detail = `${plan.intent}${plan.historyDays != null ? ` historyDays=${plan.historyDays}` : ""} ${JSON.stringify(got)} — ${plan.reply}`;
   } catch (err) {
     detail = String(err);
   }

@@ -2,6 +2,7 @@ import type { EdgeState, Telemetry, TelemetryRecord } from "@srdt/contracts";
 import type { Logger } from "../logger";
 import type { Publisher } from "../realtime/hub";
 import type { TelemetryStore } from "../storage/types";
+import type { RollupService } from "./rollup.service";
 
 /**
  * §9.3 downsampling, per device: store when TELEMETRY_PERSIST_INTERVAL_SEC has passed
@@ -48,18 +49,23 @@ export function toTelemetryRecord(
   };
 }
 
-/** Telemetry route: every message goes live to the dashboards, the store gets a downsampled copy. */
+/**
+ * Telemetry route: every message goes live to the dashboards and into the hourly rollups,
+ * the store gets a downsampled copy.
+ */
 export class TelemetryService {
   constructor(
     private readonly store: TelemetryStore,
     private readonly hub: Publisher,
     private readonly downsampler: Downsampler,
     private readonly log: Logger,
+    private readonly rollups: Pick<RollupService, "add"> | null = null,
   ) {}
 
   async handle(deviceCode: string, msg: Telemetry, measuredAt: Date, receivedAtMs: number): Promise<void> {
     const record = toTelemetryRecord(deviceCode, msg, measuredAt, receivedAtMs);
     this.hub.publish(deviceCode, { type: "telemetry", data: record });
+    this.rollups?.add(record);
     if (!this.downsampler.shouldPersist(deviceCode, msg.edgeState, receivedAtMs)) return;
     try {
       await this.store.append(record);

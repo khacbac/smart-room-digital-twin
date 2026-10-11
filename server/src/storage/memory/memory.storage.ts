@@ -1,19 +1,21 @@
 import { randomUUID } from "node:crypto";
-import type { CommandRecord, CommandStatus, DeviceRecord, EventRecord, TelemetryRecord } from "@srdt/contracts";
-import type { CommandStore, DeviceStore, EventStore, NewCommand, Storage, TelemetryStore } from "../types";
+import type { CommandRecord, CommandStatus, DeviceRecord, EventRecord, TelemetryRecord, TelemetryRollup } from "@srdt/contracts";
+import type { CommandStore, DeviceStore, EventStore, NewCommand, RollupStore, Storage, TelemetryStore } from "../types";
 
 // In-memory driver: the default until the cloud storage exists. Everything is lost on
 // restart, and each list is capped per device so a long demo does not grow forever.
 
 export interface MemoryLimits {
   telemetryPerDevice: number;
+  rollupsPerDevice: number;
   eventsPerDevice: number;
   commandsPerDevice: number;
 }
 
 export const DEFAULT_MEMORY_LIMITS: MemoryLimits = {
   telemetryPerDevice: 2000, // ≈ 3 h at one stored sample every 5 s
-  eventsPerDevice: 200,
+  rollupsPerDevice: 32 * 24, // one per hour: the assistant looks back up to 30 days
+  eventsPerDevice: 1000,
   commandsPerDevice: 200,
 };
 
@@ -91,6 +93,35 @@ class MemoryTelemetry implements TelemetryStore {
   }
 }
 
+class MemoryRollups implements RollupStore {
+  private readonly byDevice = new Map<string, Map<string, TelemetryRollup>>();
+  constructor(private readonly max: number) {}
+
+  async put(rollup: TelemetryRollup) {
+    let byHour = this.byDevice.get(rollup.deviceCode);
+    if (!byHour) {
+      byHour = new Map();
+      this.byDevice.set(rollup.deviceCode, byHour);
+    }
+    byHour.set(rollup.hour, clone(rollup));
+    while (byHour.size > this.max) {
+      const oldest = [...byHour.keys()].sort()[0];
+      if (oldest === undefined) break;
+      byHour.delete(oldest);
+    }
+  }
+  async get(deviceCode: string, hour: string) {
+    const row = this.byDevice.get(deviceCode)?.get(hour);
+    return row ? clone(row) : null;
+  }
+  async since(deviceCode: string, sinceHour: string) {
+    return [...(this.byDevice.get(deviceCode)?.values() ?? [])]
+      .filter((r) => r.hour >= sinceHour)
+      .sort((a, b) => a.hour.localeCompare(b.hour))
+      .map(clone);
+  }
+}
+
 class MemoryEvents implements EventStore {
   private readonly log: Log<EventRecord>;
   constructor(max: number) {
@@ -100,8 +131,14 @@ class MemoryEvents implements EventStore {
   async append(record: EventRecord) {
     this.log.set(record);
   }
-  async recent(deviceCode: string, limit: number) {
-    return this.log.list(deviceCode).slice(-limit).reverse().map(clone);
+  async recent(deviceCode: string, limit: number, since?: Date) {
+    const from = since?.toISOString() ?? "";
+    return this.log
+      .list(deviceCode)
+      .filter((e) => e.createdAt >= from)
+      .slice(-limit)
+      .reverse()
+      .map(clone);
   }
 }
 
@@ -148,8 +185,13 @@ class MemoryCommands implements CommandStore {
       .map(clone);
   }
 
-  async recent(deviceCode: string, limit: number) {
-    return (this.byDevice.get(deviceCode) ?? []).slice(-limit).reverse().map(clone);
+  async recent(deviceCode: string, limit: number, since?: Date) {
+    const from = since?.toISOString() ?? "";
+    return (this.byDevice.get(deviceCode) ?? [])
+      .filter((c) => c.createdAt >= from)
+      .slice(-limit)
+      .reverse()
+      .map(clone);
   }
 }
 
@@ -161,6 +203,7 @@ export function createMemoryStorage(
     driver: "memory",
     devices: new MemoryDevices(),
     telemetry: new MemoryTelemetry(limits.telemetryPerDevice),
+    rollups: new MemoryRollups(limits.rollupsPerDevice),
     events: new MemoryEvents(limits.eventsPerDevice),
     commands: new MemoryCommands(limits.commandsPerDevice, now),
     ping: async () => true,

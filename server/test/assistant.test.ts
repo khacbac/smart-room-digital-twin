@@ -6,6 +6,8 @@ import { AnthropicModel } from "../src/assistant/anthropic.model";
 import { GeminiModel } from "../src/assistant/gemini.model";
 import type { AssistantModel, PlanInput } from "../src/assistant/model";
 import { RulesModel, fold } from "../src/assistant/rules.model";
+import { addSample, emptyRollup } from "../src/telemetry/rollup.service";
+import { buildHistory, type PastData } from "../src/assistant/history";
 import { buildApi } from "../src/api/routes";
 import { CommandService, type CommandPublisher } from "../src/commands/command.service";
 import type { Publisher } from "../src/realtime/hub";
@@ -87,20 +89,25 @@ class Mqtt implements CommandPublisher {
 class ScriptedModel implements AssistantModel {
   readonly name = "scripted";
   calls = 0;
+  readonly inputs: PlanInput[] = [];
   constructor(private readonly answers: (unknown | (() => Promise<unknown>))[]) {}
-  async plan(_input: PlanInput, _signal: AbortSignal) {
+  async plan(input: PlanInput, _signal: AbortSignal) {
+    this.inputs.push(input);
     const a = this.answers[Math.min(this.calls++, this.answers.length - 1)];
     return typeof a === "function" ? (a as () => Promise<unknown>)() : a;
   }
 }
 
-function setup(model: AssistantModel | null, opts: { perMinute?: number; timeoutMs?: number } = {}) {
+function setup(
+  model: AssistantModel | null,
+  opts: { perMinute?: number; timeoutMs?: number; loadPast?: (code: string, since: Date) => Promise<PastData> } = {},
+) {
   const storage = createMemoryStorage(undefined, () => NOW);
   const hub = new Hub();
   const mqtt = new Mqtt();
   const events = { server: async () => undefined } as never;
   const commands = new CommandService(storage.commands, mqtt, events, hub, { prefix: "srdt", ackTimeoutMs: 10_000, respondWithinMs: 20 }, log);
-  const assistant = new AssistantService(model, commands, async () => telemetry, { timeoutMs: opts.timeoutMs ?? 1000, perMinute: opts.perMinute }, log, () => NOW);
+  const assistant = new AssistantService(model, commands, async () => telemetry, { timeoutMs: opts.timeoutMs ?? 1000, perMinute: opts.perMinute, loadPast: opts.loadPast }, log, () => NOW);
   return { assistant, hub, mqtt, commands };
 }
 
@@ -120,6 +127,59 @@ describe("AssistantService", () => {
     expect(mqtt.published[0]).toMatchObject({ action: "OPEN_WINDOW", value: 45, source: "ai" });
     const pushed = hub.sent.filter((m) => m.type === "command");
     expect(pushed.at(-1)).toMatchObject({ data: { source: "ai", action: "OPEN_WINDOW" } });
+  });
+
+  it("loads the history the model asks for and asks again with it", async () => {
+    const model = new ScriptedModel([
+      // the first plan only asks for data; its command must not be sent
+      { intent: "query", commands: [{ action: "OPEN_WINDOW", value: 45 }], reply: "Để mình xem.", historyDays: 45 },
+      { intent: "query", commands: [], reply: "Tháng qua có 2 ngày cảnh báo.", historyDays: null },
+    ]);
+    const loadPast = vi.fn(async () => ({ rollups: [], events: [], commands: [] }));
+    const { assistant, mqtt } = setup(model, { loadPast });
+    const res = await assistant.ask(device(), ask("tháng vừa rồi phòng có gì bất thường không?"));
+    expect(res).toMatchObject({ intent: "query", reply: "Tháng qua có 2 ngày cảnh báo.", commands: [] });
+    expect(model.calls).toBe(2);
+    // clamped to 30 days
+    expect(loadPast).toHaveBeenCalledWith("room-01", new Date(NOW - 30 * 24 * 3_600_000));
+    expect(model.inputs[0]!.past).toBeUndefined();
+    expect(model.inputs[1]!.past).toMatchObject({ days: 30, hoursWithData: 0 });
+    expect(model.inputs[1]!.room.localTime).toBe("Sat 2026-10-10 15:00 (Asia/Ho_Chi_Minh)");
+    expect(mqtt.published).toHaveLength(0);
+  });
+
+  it("loads a longer history once when the first one was too short", async () => {
+    const model = new ScriptedModel([
+      { intent: "query", commands: [], reply: "Để mình xem.", historyDays: 7 },
+      { intent: "query", commands: [], reply: "Để mình xem.", historyDays: 14 },
+      { intent: "query", commands: [], reply: "Tuần trước trung bình 26 độ.", historyDays: 30 },
+    ]);
+    const loadPast = vi.fn(async () => ({ rollups: [], events: [], commands: [] }));
+    const res = await setup(model, { loadPast }).assistant.ask(device(), ask("tuần trước trung bình bao nhiêu độ?"));
+    expect(res.reply).toBe("Tuần trước trung bình 26 độ.");
+    expect(model.inputs.map((i) => i.past?.days)).toEqual([undefined, 7, 14]);
+    expect(loadPast).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks once more with the same history when the model repeats its request", async () => {
+    const model = new ScriptedModel([
+      { intent: "query", commands: [], reply: "Để mình xem.", historyDays: 30 },
+      { intent: "query", commands: [], reply: "Để mình xem.", historyDays: 30 },
+      { intent: "query", commands: [], reply: "Tháng qua phòng bình thường.", historyDays: null },
+    ]);
+    const loadPast = vi.fn(async () => ({ rollups: [], events: [], commands: [] }));
+    const res = await setup(model, { loadPast }).assistant.ask(device(), ask("tháng qua thế nào?"));
+    expect(res.reply).toBe("Tháng qua phòng bình thường.");
+    expect(model.calls).toBe(3);
+    expect(loadPast).toHaveBeenCalledTimes(1);
+  });
+
+  it("says so when the history cannot be read", async () => {
+    const asking = () => new ScriptedModel([{ intent: "query", commands: [], reply: "Để mình xem.", historyDays: 7 }]);
+    const none = setup(asking());
+    expect((await none.assistant.ask(device(), ask("tuần này thế nào?"))).reply).toMatch(/chưa đọc được dữ liệu lịch sử/);
+    const failing = setup(asking(), { loadPast: async () => Promise.reject(new Error("firestore down")) });
+    expect((await failing.assistant.ask(device(), ask("tuần này thế nào?"))).reply).toMatch(/chưa đọc được dữ liệu lịch sử/);
   });
 
   it("clamps the angle and fills a missing one with 90", () => {
@@ -304,6 +364,26 @@ describe("RulesModel", () => {
     expect((await plan("Bật điều hoà")).intent).toBe("unsupported");
     expect((await plan("Làm gì đó đi")).intent).toBe("clarify");
     expect((await plan("Nóng quá")).commands).toEqual([{ action: "OPEN_WINDOW", value: 90 }]);
+  });
+
+  it("politely declines questions unrelated to the room", async () => {
+    const declined = await plan("Thời tiết Hà Nội ngày mai thế nào?");
+    expect(declined).toMatchObject({ intent: "unsupported", commands: [] });
+    expect(declined.reply).toMatch(/ngoài phạm vi/);
+    expect((await plan("Tell me a joke", room(), "en-US")).reply).toMatch(/outside what I can help with/);
+  });
+
+  it("asks for history, then summarises it", async () => {
+    expect(await plan("Tháng vừa rồi phòng có gì bất thường không?")).toMatchObject({ intent: "query", historyDays: 30 });
+    expect((await plan("Hôm qua nóng không?")).historyDays).toBe(2);
+    expect((await plan("Was anything unusual this week?", room(), "en-US")).historyDays).toBe(7);
+
+    const r = emptyRollup("room-01", "2026-10-05T07");
+    addSample(r, { ...telemetry, measuredAt: "2026-10-05T07:00:00.000Z", edgeState: "DANGER", temperature: 36 });
+    const past = buildHistory({ rollups: [r], events: [], commands: [] }, 30, NOW, "Asia/Ho_Chi_Minh");
+    const answer = await rules.plan({ text: "Tháng vừa rồi có gì bất thường không?", locale: "vi-VN", history: [], room: room(), past });
+    expect(answer.historyDays).toBeUndefined();
+    expect(answer.reply).toMatch(/nguy hiểm, gần nhất: 2026-10-05 Mon/);
   });
 
   it("offers the window for a missing device and acts on yes", async () => {
