@@ -123,7 +123,11 @@ export class CommandService {
       this.pushed(row);
       log.info({ status: ack.status, reason: ack.reason }, "command acked");
     } else {
-      log.info({ status: ack.status }, "late ack, status unchanged");
+      // Another backend on the same broker and store may have taken the ack first: push
+      // the stored row anyway, or this backend's dashboards would wait on `sent` forever.
+      const stored = await this.store.get(ack.commandId);
+      if (stored) this.pushed(stored);
+      log.info({ status: ack.status, stored: stored?.status }, "late ack, status unchanged");
     }
   }
 

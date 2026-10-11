@@ -301,6 +301,18 @@ describe("downlink (command round trip)", () => {
     expect(row?.sentAt).not.toBeNull();
   });
 
+  it("an ack another backend already stored still reaches this backend's dashboards", async () => {
+    const t = await setup();
+    await t.receive("telemetry", telemetryMsg());
+    const res = await t.commands.create(t.devices.get("room-01")!, { action: "CLOSE_WINDOW" });
+    if (res.kind !== "accepted") throw new Error("not accepted");
+    // the other backend on the same broker and store wins the transition
+    await t.storage.commands.transition(res.commandId, ["sent"], { status: "executed" });
+    await t.receive("command/ack", ack(res.commandId));
+    const last = t.hub.sent.filter((s) => s.msg.type === "command").at(-1);
+    expect(last?.msg.type === "command" && last.msg.data.status).toBe("executed");
+  });
+
   it("offline device → device_offline; broker down → broker_disconnected", async () => {
     const t = await setup();
     const device = t.devices.get("room-01")!;
